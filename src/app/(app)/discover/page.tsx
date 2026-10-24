@@ -1,0 +1,11 @@
+import type { Metadata } from "next";
+import { DiscoverView } from "@/components/discover-view";
+
+export const metadata: Metadata = {
+  title: "Discover",
+  description: "Find nearby tasks ranked by Doro Match.",
+};
+
+export default function DiscoverPage() {
+  return <DiscoverView />;
+}
