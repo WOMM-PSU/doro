@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
   ArrowRight,
@@ -416,11 +416,36 @@ export function MapPanel({
     map.setZoom(map.getZoom() + delta);
   };
 
-  const handleRecenter = () => {
-    const map = leafletMapRef.current;
-    if (!map) return;
-    map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate: true });
-  };
+  // Frame every pickup and drop-off in view, or the campus core when nothing matches.
+  const fitToTasks = useCallback(
+    (animate: boolean) => {
+      const L = leafletModuleRef.current;
+      const map = leafletMapRef.current;
+      if (!L || !map) return;
+      const points = tasks.flatMap(({ task }) =>
+        [task.locationId, task.dropoffLocationId]
+          .filter((id): id is string => Boolean(id))
+          .map((id) => {
+            const loc = getLocation(id);
+            return L.latLng(loc.lat, loc.lng);
+          }),
+      );
+      if (points.length === 0) {
+        map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate });
+        return;
+      }
+      map.fitBounds(L.latLngBounds(points), { padding: [44, 44], maxZoom: 16, animate });
+    },
+    [tasks, compact],
+  );
+
+  // Refit when the map first loads and whenever the set of tasks changes
+  // (filters, search), but not when only the selection changes.
+  const taskKey = useMemo(() => tasks.map((r) => r.task.id).sort().join(","), [tasks]);
+  useEffect(() => {
+    if (mapReady) fitToTasks(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, taskKey]);
 
   const handleLocate = () => {
     const L = leafletModuleRef.current;
@@ -552,9 +577,9 @@ export function MapPanel({
               </button>
               <button
                 type="button"
-                onClick={handleRecenter}
-                title="Recenter on Penn State campus core"
-                aria-label="Recenter map on campus core"
+                onClick={() => fitToTasks(true)}
+                title="Show all tasks"
+                aria-label="Show all tasks on the map"
                 className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
               >
                 <Compass className="size-3.5" aria-hidden />
