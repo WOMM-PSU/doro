@@ -67,6 +67,32 @@ const CATEGORY_SKILLS: Record<TaskCategory, string[]> = {
 
 type DeadlinePreset = "asap" | "today" | "tomorrow" | "custom";
 
+/** Validated fields in on-screen order, so a failed publish jumps to the first one. */
+const FIELD_ORDER: { key: string; id: string }[] = [
+  { key: "title", id: "task-title" },
+  { key: "description", id: "task-description" },
+  { key: "duration", id: "task-duration" },
+  { key: "dropoff", id: "task-dropoff" },
+  { key: "deadline", id: "deadline-options" },
+  { key: "reward", id: "task-reward" },
+  { key: "expense", id: "task-expense" },
+];
+
+/** Scrolls a field (or error) into the middle of the dialog and focuses it. */
+function revealField(id: string) {
+  // Wait a frame so freshly rendered errors and expanded sections exist.
+  window.requestAnimationFrame(() => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.scrollIntoView({ block: "center" });
+    const focusTarget =
+      element.matches("input, textarea, select")
+        ? element
+        : element.querySelector<HTMLElement>("[aria-pressed='true'], input, button");
+    focusTarget?.focus({ preventScroll: true });
+  });
+}
+
 export function PostTaskDialog() {
   const { user, store, state } = useDemo();
   const ui = useUi();
@@ -88,7 +114,7 @@ export function PostTaskDialog() {
   const [customDeadline, setCustomDeadline] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState(15);
   const [durationTouched, setDurationTouched] = useState(false);
-  const [rewardInput, setRewardInput] = useState("6.00");
+  const [rewardInput, setRewardInput] = useState("");
   const [rewardTouched, setRewardTouched] = useState(false);
   const [acceptanceMode, setAcceptanceMode] = useState<AcceptanceMode>("fixed");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("stripe_card");
@@ -106,7 +132,6 @@ export function PostTaskDialog() {
 
   const isDelivery = category === "delivery";
   const deadline = useMemo(() => resolveDeadline(preset, customDeadline), [preset, customDeadline]);
-  const rewardCents = Math.max(0, Math.round(Number(rewardInput || 0) * 100));
   const expenseCents = expenseInput.trim() ? Math.max(0, Math.round(Number(expenseInput) * 100)) : 0;
 
   const recommendation = useMemo(
@@ -148,6 +173,10 @@ export function PostTaskDialog() {
     };
   }, []);
 
+  // Until the requester edits the reward, it follows the typical suggestion.
+  const rewardValue = rewardTouched ? rewardInput : (recommendation.typicalCents / 100).toFixed(2);
+  const rewardCents = Math.max(0, Math.round(Number(rewardValue || 0) * 100));
+
   const inference = useMemo(
     () => inferTaskDetails(`${title} ${description}`),
     [title, description],
@@ -160,12 +189,6 @@ export function PostTaskDialog() {
       ),
     [title, description, requirements, itemDescription, instructions],
   );
-
-  useEffect(() => {
-    if (!rewardTouched) {
-      setRewardInput((recommendation.typicalCents / 100).toFixed(2));
-    }
-  }, [recommendation.typicalCents, rewardTouched]);
 
   const resetAll = () => {
     setTitle("");
@@ -220,7 +243,7 @@ export function PostTaskDialog() {
     ui.closeCompose();
   };
 
-  const validate = (): boolean => {
+  const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
     if (title.trim().length < 4) next.title = "Give the task a short, clear title.";
     if (description.trim().length < 12) next.description = "Add a sentence or two about what you need.";
@@ -232,7 +255,7 @@ export function PostTaskDialog() {
     if (!Number.isFinite(estimatedMinutes) || estimatedMinutes < 5 || estimatedMinutes > 240) {
       next.duration = "Estimate between 5 and 240 minutes.";
     }
-    if (!Number.isFinite(Number(rewardInput)) || rewardCents < 100) {
+    if (!Number.isFinite(Number(rewardValue)) || rewardCents < 100) {
       next.reward = "Set a reward of at least $1.00.";
     }
     if (rewardCents > 100_000) next.reward = "This demo supports rewards up to $1,000.";
@@ -240,11 +263,20 @@ export function PostTaskDialog() {
       next.expense = "Keep reimbursable expenses under $200.";
     }
     setErrors(next);
-    return Object.keys(next).length === 0;
+    return next;
   };
 
   const handleSubmit = () => {
-    if (!validate() || !deadline) return;
+    const next = validate();
+    const firstInvalid = FIELD_ORDER.find((field) => next[field.key]);
+    if (firstInvalid) {
+      if (firstInvalid.key === "expense") setMoreOpen(true);
+      revealField(
+        firstInvalid.key === "deadline" && preset === "custom" ? "custom-deadline" : firstInvalid.id,
+      );
+      return;
+    }
+    if (!deadline) return;
     const result = store.createTask({
       title,
       description,
@@ -265,6 +297,7 @@ export function PostTaskDialog() {
     });
     if (!result.ok) {
       setFormError(result.error);
+      revealField("post-task-error");
       return;
     }
     setFormError(null);
@@ -460,7 +493,7 @@ export function PostTaskDialog() {
               className="min-w-0 space-y-6"
             >
               {formError ? (
-                <div className="flex items-start gap-2 rounded-xl border border-[#f1d3ce] bg-danger-soft px-3 py-2.5 text-[12px] leading-relaxed text-danger" role="alert">
+                <div id="post-task-error" className="flex items-start gap-2 rounded-xl border border-[#f1d3ce] bg-danger-soft px-3 py-2.5 text-[12px] leading-relaxed text-danger" role="alert">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {formError}
                 </div>
@@ -713,7 +746,7 @@ export function PostTaskDialog() {
                   <p className="text-[13px] font-semibold text-ink" id="deadline-label">
                     Deadline
                   </p>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="group" aria-labelledby="deadline-label">
+                  <div id="deadline-options" className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="group" aria-labelledby="deadline-label">
                     {(
                       [
                         { value: "asap", label: "ASAP" },
@@ -860,7 +893,7 @@ export function PostTaskDialog() {
                         min={1}
                         max={1000}
                         step="0.50"
-                        value={rewardInput}
+                        value={rewardValue}
                         onChange={(e) => {
                           setRewardInput(e.target.value);
                           setRewardTouched(true);
@@ -895,7 +928,7 @@ export function PostTaskDialog() {
                   min={1}
                   max={40}
                   step={0.5}
-                  value={Math.min(40, Math.max(1, Number(rewardInput) || 1))}
+                  value={Math.min(40, Math.max(1, Number(rewardValue) || 1))}
                   onChange={(e) => {
                     setRewardInput(Number(e.target.value).toFixed(2));
                     setRewardTouched(true);

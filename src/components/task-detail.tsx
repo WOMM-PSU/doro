@@ -127,7 +127,7 @@ export function TaskDetailSheet() {
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
   const [uploading, setUploading] = useState<TaskAttachment["kind"] | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   const taskId = task?.id;
   useEffect(() => {
@@ -158,10 +158,13 @@ export function TaskDetailSheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id, task?.helperId, user.id, messages.length, store]);
 
+  // Scroll only the message list itself; scrollIntoView would also scroll the
+  // sheet and open the task halfway down at the chat.
   useEffect(() => {
-    if (!open) return;
-    messagesEndRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages.length, open]);
+    const list = messagesRef.current;
+    if (!open || !list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [messages.length, open, taskId]);
 
   // This hook must run on every render, before the early return, so the hook
   // order stays stable when a task is opened or closed.
@@ -826,7 +829,7 @@ export function TaskDetailSheet() {
                 </h3>
                 <span className="text-[10.5px] text-muted">Task conversation only</span>
               </div>
-              <div className="max-h-[280px] space-y-2.5 overflow-y-auto px-4 py-3">
+              <div ref={messagesRef} className="max-h-[280px] space-y-2.5 overflow-y-auto px-4 py-3">
                 {messages.length === 0 ? (
                   <p className="py-4 text-center text-[11.5px] text-muted">
                     No messages yet. Say hello and confirm the details.
@@ -870,7 +873,6 @@ export function TaskDetailSheet() {
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
               </div>
               {canMessage && messageModeration.level !== "allow" ? (
                 <div
@@ -1423,9 +1425,11 @@ function TaskActions({
               <Button variant="outline" onClick={onCancel} disabled={!cancelAllowed}>
                 Cancel task
               </Button>
-              <Button variant="dark" onClick={() => ui.closeTask()} className="hidden sm:inline-flex">
-                Back to browse
-              </Button>
+              <div className="hidden sm:block">
+                <Button variant="dark" onClick={() => ui.closeTask()}>
+                  Back to browse
+                </Button>
+              </div>
             </>
           ) : null}
           {startAllowed ? (
