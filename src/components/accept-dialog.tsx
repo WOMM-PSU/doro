@@ -2,7 +2,7 @@
 
 import { Banknote, CalendarDays, Clock3, CreditCard, MapPin, ShieldCheck } from "lucide-react";
 import { useDemo, useUi } from "@/components/providers";
-import { canAcceptTask, getTask, getUser } from "@/features/selectors";
+import { canAcceptTask, getTask, getUser, getUserStats } from "@/features/selectors";
 import { getLocation } from "@/lib/locations";
 import { createStripeEscrowHold } from "@/lib/stripe-client";
 import { formatDeadline } from "@/lib/time";
@@ -17,6 +17,7 @@ export function AcceptTaskDialog() {
   const open = Boolean(ui.acceptTaskId);
   const requester = task ? getUser(state, task.requesterId) : undefined;
   const allowed = task ? canAcceptTask(task, user) : false;
+  const requesterStats = requester ? getUserStats(state, requester) : null;
 
   if (!task) {
     return (
@@ -172,8 +173,8 @@ export function AcceptTaskDialog() {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-ink">{requester.name}</p>
               <p className="text-[11px] text-muted">
-                {requester.history.ratingCount > 0
-                  ? `${(requester.history.ratingSum / requester.history.ratingCount).toFixed(1)}★ from ${requester.history.ratingCount} reviews`
+                {requesterStats?.rating
+                  ? `${requesterStats.rating.toFixed(1)}★ from ${requesterStats.ratingCount} ${requesterStats.ratingCount === 1 ? "review" : "reviews"}`
                   : "No reviews yet"}
               </p>
             </div>

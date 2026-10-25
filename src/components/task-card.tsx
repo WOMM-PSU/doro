@@ -10,7 +10,7 @@ import {
   Star,
 } from "lucide-react";
 import type { User } from "@/types";
-import type { RankedTask } from "@/features/selectors";
+import { getUserStats, type RankedTask } from "@/features/selectors";
 import { getLocation } from "@/lib/locations";
 import { CATEGORY_LABELS } from "@/features/matching";
 import { formatDeadline, formatShortDeadline } from "@/lib/time";
@@ -35,7 +35,7 @@ export function TaskCard({
   requester?: User;
 }) {
   const { task, match, distanceMiles, travelMinutes, minutesLeft } = ranked;
-  const { user } = useDemo();
+  const { state, user } = useDemo();
   const ui = useUi();
   const category = CATEGORY_LABELS[task.category];
   const Icon = CATEGORY_ICONS[task.category];
@@ -46,6 +46,7 @@ export function TaskCard({
   const travelMode = user.preferences.travelMode;
   const totalMinutes = task.estimatedMinutes + travelMinutes;
   const bestMatch = mode === "foryou" && rank === 0 && match.score >= 70;
+  const requesterRating = requester ? getUserStats(state, requester).rating : null;
 
   return (
     <article
@@ -157,10 +158,10 @@ export function TaskCard({
                 {requester.verified ? (
                   <BadgeCheck className="size-3.5 shrink-0 text-[#587d2a]" aria-label="Verified" />
                 ) : null}
-                {requester.history.ratingCount > 0 ? (
+                {requesterRating !== null ? (
                   <span className="inline-flex items-center gap-0.5 text-[10.5px] text-muted">
                     <Star className="size-3 fill-[#1d1f23] text-[#1d1f23]" aria-hidden />
-                    {(requester.history.ratingSum / requester.history.ratingCount).toFixed(1)}
+                    {requesterRating.toFixed(1)}
                   </span>
                 ) : (
                   <span className="text-[10px] text-muted">New</span>
