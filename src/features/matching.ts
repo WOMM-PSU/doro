@@ -9,11 +9,8 @@
 import type { Task, TaskCategory, User } from "@/types";
 import { clamp01 } from "@/lib/format";
 import { formatHourly } from "@/lib/format";
-import {
-  estimateRouteMiles,
-  getLocation,
-  travelMinutes,
-} from "@/lib/locations";
+import { getLocation, travelMinutes } from "@/lib/locations";
+import { placeDistance, taskDropoff, taskPickup } from "@/lib/places";
 import { minutesUntil } from "@/lib/time";
 
 export const MATCH_WEIGHTS = {
@@ -145,11 +142,16 @@ export function calculateMatch(
   options?: { completedForRequester?: boolean },
 ): MatchResult {
   const now = context.now ?? new Date();
-  const routeMiles = estimateRouteMiles(
-    helper.homeLocationId,
-    task.locationId,
-    task.dropoffLocationId,
-  );
+  // Exact coordinates from the task's own places, so a typed address measures
+  // correctly instead of snapping to whichever catalogue spot is nearest.
+  const pickup = taskPickup(task);
+  const dropoff = taskDropoff(task);
+  const routeMiles =
+    Math.round(
+      (placeDistance(getLocation(helper.homeLocationId), pickup) +
+        (dropoff ? placeDistance(pickup, dropoff) : 0)) *
+        100,
+    ) / 100;
   const travel = travelMinutes(routeMiles, helper.preferences.travelMode);
   const waiting = task.dropoffLocationId ? MATCH_CONFIG.waitingMinutes : 0;
   const totalMinutes = Math.max(5, travel + task.estimatedMinutes + waiting);

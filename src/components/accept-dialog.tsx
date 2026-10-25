@@ -3,7 +3,7 @@
 import { Banknote, CalendarDays, Clock3, CreditCard, MapPin, ShieldCheck } from "lucide-react";
 import { useDemo, useUi } from "@/components/providers";
 import { canAcceptTask, getTask, getUser, getUserStats } from "@/features/selectors";
-import { getLocation } from "@/lib/locations";
+import { taskDropoff, taskPickup } from "@/lib/places";
 import { createStripeEscrowHold } from "@/lib/stripe-client";
 import { formatDeadline } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
@@ -112,9 +112,9 @@ export function AcceptTaskDialog() {
               <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />
               <div>
                 <dt className="sr-only">Location</dt>
-                <dd className="font-medium text-ink">{getLocation(task.locationId).name}</dd>
-                {task.dropoffLocationId ? (
-                  <dd className="text-muted">→ {getLocation(task.dropoffLocationId).name}</dd>
+                <dd className="font-medium text-ink">{taskPickup(task).label}</dd>
+                {taskDropoff(task) ? (
+                  <dd className="text-muted">→ {taskDropoff(task)!.label}</dd>
                 ) : null}
               </div>
             </div>

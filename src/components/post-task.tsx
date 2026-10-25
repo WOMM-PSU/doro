@@ -19,7 +19,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import type { AcceptanceMode, PaymentMethod, TaskCategory } from "@/types";
+import type { AcceptanceMode, PaymentMethod, TaskCategory, TaskPlace } from "@/types";
 import { useDemo, useUi } from "@/components/providers";
 import { CATEGORY_LABELS } from "@/features/matching";
 import {
@@ -36,7 +36,15 @@ import {
   type SentenceAiStatus,
 } from "@/lib/sentence-ai";
 import { DEMO_MODE } from "@/lib/demo-mode";
-import { LOCATIONS, getLocation } from "@/lib/locations";
+import { getLocation } from "@/lib/locations";
+import {
+  nearestLocationId,
+  placeFromLocationId,
+  samePlace,
+  taskDropoff,
+  taskPickup,
+} from "@/lib/places";
+import { AddressField } from "@/components/address-field";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
 import {
@@ -47,7 +55,6 @@ import {
   Input,
   Modal,
   Pill,
-  Select,
   Textarea,
   cn,
   useToast,
@@ -79,7 +86,9 @@ const FIELD_ORDER: { key: string; id: string }[] = [
   { key: "title", id: "task-title" },
   { key: "description", id: "task-description" },
   { key: "duration", id: "task-duration" },
+  { key: "pickup", id: "task-pickup" },
   { key: "dropoff", id: "task-dropoff" },
+  { key: "location", id: "task-location" },
   { key: "deadline", id: "deadline-options" },
   { key: "reward", id: "task-reward" },
   { key: "expense", id: "task-expense" },
@@ -112,11 +121,21 @@ export function PostTaskDialog() {
   const [sentenceBusy, setSentenceBusy] = useState(false);
   const [aiStatus, setAiStatus] = useState<SentenceAiStatus | null>(null);
   const [category, setCategory] = useState<TaskCategory>("delivery");
-  const [pickupId, setPickupId] = useState(user.homeLocationId);
-  const [dropoffId, setDropoffId] = useState(
-    user.homeLocationId === "hub" ? "pattee" : "hub",
+  // Places carry coordinates, so any typed address works. The `…Id` values
+  // below are the nearest catalogue spot, which preferences, matching and copy
+  // still key off.
+  const [pickup, setPickup] = useState<TaskPlace | undefined>(() =>
+    placeFromLocationId(user.homeLocationId),
   );
-  const [locationId, setLocationId] = useState(user.homeLocationId);
+  const [dropoff, setDropoff] = useState<TaskPlace | undefined>(() =>
+    placeFromLocationId(user.homeLocationId === "hub" ? "pattee" : "hub"),
+  );
+  const [spot, setSpot] = useState<TaskPlace | undefined>(() =>
+    placeFromLocationId(user.homeLocationId),
+  );
+  const pickupId = pickup ? pickup.locationId ?? nearestLocationId(pickup) : user.homeLocationId;
+  const dropoffId = dropoff ? dropoff.locationId ?? nearestLocationId(dropoff) : undefined;
+  const locationId = spot ? spot.locationId ?? nearestLocationId(spot) : user.homeLocationId;
   const [preset, setPreset] = useState<DeadlinePreset>("asap");
   const [customDeadline, setCustomDeadline] = useState("");
   const [allowLateFinish, setAllowLateFinish] = useState(false);
@@ -148,6 +167,8 @@ export function PostTaskDialog() {
         category,
         estimatedMinutes: Number.isFinite(estimatedMinutes) ? estimatedMinutes : 15,
         deadline: deadline ?? undefined,
+        pickup: isDelivery ? pickup : spot,
+        dropoff: isDelivery ? dropoff : undefined,
         locationId: isDelivery ? pickupId : locationId,
         dropoffLocationId: isDelivery ? dropoffId : undefined,
         expenseCents,
@@ -163,9 +184,11 @@ export function PostTaskDialog() {
       estimatedMinutes,
       deadline,
       isDelivery,
-      pickupId,
-      dropoffId,
+      pickup,
+      dropoff,
+      spot,
       locationId,
+      dropoffId,
       expenseCents,
       state.tasks,
     ],
@@ -204,9 +227,9 @@ export function PostTaskDialog() {
     setSentence("");
     setSentenceBusy(false);
     setCategory("delivery");
-    setPickupId(user.homeLocationId);
-    setDropoffId(user.homeLocationId === "hub" ? "pattee" : "hub");
-    setLocationId(user.homeLocationId);
+    setPickup(placeFromLocationId(user.homeLocationId));
+    setDropoff(placeFromLocationId(user.homeLocationId === "hub" ? "pattee" : "hub"));
+    setSpot(placeFromLocationId(user.homeLocationId));
     setPreset("asap");
     setCustomDeadline("");
     setAllowLateFinish(false);
@@ -246,11 +269,11 @@ export function PostTaskDialog() {
     setTitle(source.title);
     setDescription(source.description);
     setCategory(source.category);
-    if (source.category === "delivery" && source.dropoffLocationId) {
-      setPickupId(source.locationId);
-      setDropoffId(source.dropoffLocationId);
+    if (source.category === "delivery") {
+      setPickup(taskPickup(source));
+      setDropoff(taskDropoff(source));
     } else {
-      setLocationId(source.locationId);
+      setSpot(taskPickup(source));
     }
     setEstimatedMinutes(source.estimatedMinutes);
     setDurationTouched(true);
@@ -288,7 +311,12 @@ export function PostTaskDialog() {
     const next: Record<string, string> = {};
     if (title.trim().length < 4) next.title = "Give the task a short, clear title.";
     if (description.trim().length < 12) next.description = "Add a sentence or two about what you need.";
-    if (isDelivery && pickupId === dropoffId) next.dropoff = "Pickup and drop-off need to be different.";
+    if (isDelivery && !pickup) next.pickup = "Choose a pickup address from the suggestions.";
+    if (isDelivery && !dropoff) next.dropoff = "Choose a drop-off address from the suggestions.";
+    if (isDelivery && pickup && dropoff && samePlace(pickup, dropoff)) {
+      next.dropoff = "Pickup and drop-off need to be different.";
+    }
+    if (!isDelivery && !spot) next.location = "Choose a location from the suggestions.";
     if (!deadline) next.deadline = "Choose a valid deadline.";
     else if (new Date(deadline).getTime() - Date.now() < 5 * 60_000) {
       next.deadline = "Choose a deadline at least five minutes from now.";
@@ -322,6 +350,8 @@ export function PostTaskDialog() {
       title,
       description,
       category,
+      pickup: isDelivery ? pickup : spot,
+      dropoff: isDelivery ? dropoff : undefined,
       locationId: isDelivery ? pickupId : locationId,
       dropoffLocationId: isDelivery ? dropoffId : undefined,
       rewardCents,
@@ -373,11 +403,11 @@ export function PostTaskDialog() {
         setRewardTouched(true);
       }
       if (parsed.dropoffLocationId) {
-        setPickupId(parsed.locationId ?? pickupId);
-        setDropoffId(parsed.dropoffLocationId);
+        setPickup(placeFromLocationId(parsed.locationId));
+        setDropoff(placeFromLocationId(parsed.dropoffLocationId));
       } else if (parsed.locationId) {
-        setLocationId(parsed.locationId);
-        setPickupId(parsed.locationId);
+        setSpot(placeFromLocationId(parsed.locationId));
+        setPickup(placeFromLocationId(parsed.locationId));
       }
       if (parsed.deadline) {
         setPreset("custom");
@@ -757,51 +787,38 @@ export function PostTaskDialog() {
                   <h3 className="text-[13px] font-bold uppercase tracking-[0.1em] text-muted">
                     2 · Where & when
                   </h3>
-                  <span className="text-[10px] text-muted">Approximate demo places</span>
+                  <span className="text-[10px] text-muted">Any address works</span>
                 </div>
 
                 {isDelivery ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Pickup" htmlFor="task-pickup">
-                      <Select
+                    <Field label="Pickup" htmlFor="task-pickup" error={errors.pickup}>
+                      <AddressField
                         id="task-pickup"
-                        value={pickupId}
-                        onChange={(e) => setPickupId(e.target.value)}
-                      >
-                        {LOCATIONS.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.name}
-                          </option>
-                        ))}
-                      </Select>
+                        value={pickup}
+                        onChange={setPickup}
+                        placeholder="e.g. Pollock Hall 214"
+                        hint="Room or street detail is fine."
+                      />
                     </Field>
                     <Field label="Drop-off" htmlFor="task-dropoff" error={errors.dropoff}>
-                      <Select
+                      <AddressField
                         id="task-dropoff"
-                        value={dropoffId}
-                        onChange={(e) => setDropoffId(e.target.value)}
-                      >
-                        {LOCATIONS.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.name}
-                          </option>
-                        ))}
-                      </Select>
+                        value={dropoff}
+                        onChange={setDropoff}
+                        placeholder="e.g. 216 Hammond Building"
+                      />
                     </Field>
                   </div>
                 ) : (
-                  <Field label="Location" htmlFor="task-location">
-                    <Select
+                  <Field label="Location" htmlFor="task-location" error={errors.location}>
+                    <AddressField
                       id="task-location"
-                      value={locationId}
-                      onChange={(e) => setLocationId(e.target.value)}
-                    >
-                      {LOCATIONS.map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </Select>
+                      value={spot}
+                      onChange={setSpot}
+                      placeholder="Where does the task happen?"
+                      hint="Type any address, or pick a campus place."
+                    />
                   </Field>
                 )}
 

@@ -70,7 +70,8 @@ import {
 import { calculateMatch, CATEGORY_LABELS } from "@/features/matching";
 import { analyzeMessage } from "@/features/moderation";
 import { DEMO_MODE } from "@/lib/demo-mode";
-import { distanceBetweenLocations, getLocation, travelMinutes } from "@/lib/locations";
+import { getLocation, travelMinutes } from "@/lib/locations";
+import { placeDistance, taskDropoff, taskPickup } from "@/lib/places";
 import {
   captureStripeEscrowHold,
   createStripeEscrowHold,
@@ -204,7 +205,10 @@ export function TaskDetailSheet() {
 
   const minutes = minutesUntil(task.deadline);
   const urgent = minutes > 0 && minutes <= 180;
-  const routeMiles = match?.routeMiles ?? distanceBetweenLocations(task.locationId, task.dropoffLocationId ?? task.locationId);
+  const pickupPlace = taskPickup(task);
+  const dropoffPlace = taskDropoff(task);
+  const routeMiles =
+    match?.routeMiles ?? (dropoffPlace ? placeDistance(pickupPlace, dropoffPlace) : 0);
   const routeMinutes = match?.travelMinutes ?? travelMinutes(routeMiles);
   const handoffNeeded = Boolean(task.handoffCode) && !task.handoffVerified;
   const canReview = canReviewTask(state, task, user);
@@ -444,13 +448,13 @@ export function TaskDetailSheet() {
           <div className="grid grid-cols-2 gap-2.5">
             <MetaCard
               icon={<MapPin className="size-4" />}
-              label={task.dropoffLocationId ? "Pickup → drop-off" : "Location"}
+              label={dropoffPlace ? "Pickup → drop-off" : "Location"}
               value={
-                task.dropoffLocationId
-                  ? `${getLocation(task.locationId).shortLabel} → ${getLocation(task.dropoffLocationId).shortLabel}`
-                  : getLocation(task.locationId).name
+                dropoffPlace
+                  ? `${pickupPlace.label} → ${dropoffPlace.label}`
+                  : pickupPlace.label
               }
-              hint={getLocation(task.locationId).area}
+              hint={getLocation(pickupPlace.locationId ?? task.locationId).area}
             />
             <MetaCard
               icon={<CalendarDays className="size-4" />}

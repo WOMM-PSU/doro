@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { User } from "@/types";
 import { getUserStats, type RankedTask } from "@/features/selectors";
-import { getLocation } from "@/lib/locations";
+import { taskDropoff, taskPickup } from "@/lib/places";
 import { CATEGORY_LABELS } from "@/features/matching";
 import { formatDeadline, formatShortDeadline } from "@/lib/time";
 import { formatMiles, formatMoney, formatTravel } from "@/lib/format";
@@ -41,8 +41,8 @@ export function TaskCard({
   const Icon = CATEGORY_ICONS[task.category];
   const isOwn = task.requesterId === user.id;
   const urgent = minutesLeft > 0 && minutesLeft <= 180;
-  const pickup = getLocation(task.locationId);
-  const dropoff = task.dropoffLocationId ? getLocation(task.dropoffLocationId) : undefined;
+  const pickup = taskPickup(task);
+  const dropoff = taskDropoff(task);
   const travelMode = user.preferences.travelMode;
   const totalMinutes = task.estimatedMinutes + travelMinutes;
   const bestMatch = mode === "foryou" && rank === 0 && match.score >= 70;
@@ -105,7 +105,7 @@ export function TaskCard({
           <span className="inline-flex min-w-0 items-center gap-1">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">
-              {dropoff ? `${pickup.shortLabel} → ${dropoff.shortLabel}` : pickup.shortLabel}
+              {dropoff ? `${pickup.label} → ${dropoff.label}` : pickup.label}
             </span>
           </span>
           <span className="inline-flex items-center gap-1">

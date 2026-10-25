@@ -14,7 +14,8 @@ import type {
   User,
 } from "@/types";
 import { CATEGORY_LABELS, calculateMatch, compareMatches, type MatchResult } from "@/features/matching";
-import { getLocation, locationName, locationShort } from "@/lib/locations";
+import { getLocation, locationName } from "@/lib/locations";
+import { taskDropoff, taskPickup } from "@/lib/places";
 import { minutesUntil } from "@/lib/time";
 
 export type DiscoverMode = "foryou" | "nearby" | "reward" | "urgent";
@@ -384,10 +385,9 @@ export function taskCategoryLabel(category: TaskCategory): string {
 }
 
 export function taskLocationLabel(task: Task): string {
-  if (task.dropoffLocationId) {
-    return `${locationShort(task.locationId)} → ${locationShort(task.dropoffLocationId)}`;
-  }
-  return getLocation(task.locationId).name;
+  const pickup = taskPickup(task);
+  const dropoff = taskDropoff(task);
+  return dropoff ? `${pickup.label} → ${dropoff.label}` : pickup.label;
 }
 
 export function getCounterpart(task: Task, user: User): string | undefined {

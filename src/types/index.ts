@@ -95,6 +95,17 @@ export interface User {
   stripeAccountReady?: boolean;
 }
 
+/**
+ * A real place on a task: what the requester typed plus its coordinates.
+ * `locationId` is filled when it is (or is nearest to) a catalogue spot.
+ */
+export interface TaskPlace {
+  label: string;
+  lat: number;
+  lng: number;
+  locationId?: string;
+}
+
 export type AttachmentKind = "dropoff" | "receipt";
 
 /** Metadata only; the image bytes live in IndexedDB on this device. */
@@ -114,9 +125,13 @@ export interface Task {
   title: string;
   description: string;
   category: TaskCategory;
-  /** Pickup point for deliveries, otherwise the task location. */
+  /** Nearest catalogue spot to the pickup, used by preferences and copy. */
   locationId: string;
   dropoffLocationId?: string;
+  /** Exact pickup place, so any address works. Falls back to `locationId`. */
+  pickup?: TaskPlace;
+  /** Exact drop-off place for deliveries. Falls back to `dropoffLocationId`. */
+  dropoff?: TaskPlace;
   rewardCents: number;
   acceptanceMode: AcceptanceMode;
   paymentMethod?: PaymentMethod;
@@ -268,8 +283,12 @@ export interface TaskDraft {
   title: string;
   description: string;
   category: TaskCategory;
-  locationId: string;
+  /** Legacy catalogue ids; derived from the places below when omitted. */
+  locationId?: string;
   dropoffLocationId?: string;
+  /** Exact addresses. When present these win over the ids. */
+  pickup?: TaskPlace;
+  dropoff?: TaskPlace;
   rewardCents: number;
   acceptanceMode: AcceptanceMode;
   paymentMethod?: PaymentMethod;

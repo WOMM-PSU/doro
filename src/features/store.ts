@@ -30,7 +30,12 @@ import type { StateRepository, SyncInfo } from "@/lib/repository";
 import { LocalRepository } from "@/lib/repository";
 import { calculateMatch, CATEGORY_LABELS, MATCH_CONFIG } from "@/features/matching";
 import { formatMiles, formatMoney } from "@/lib/format";
-import { getLocation } from "@/lib/locations";
+import {
+  isUsablePlace,
+  nearestLocationId,
+  placeFromLocationId,
+  samePlace,
+} from "@/lib/places";
 import { inQuietHours, minutesUntil } from "@/lib/time";
 import { analyzeMessage, detectProhibitedRequest, REPORT_REASONS } from "@/features/moderation";
 import { awaitingLateDecision, getTask } from "@/features/selectors";
@@ -232,9 +237,15 @@ function validateTaskDraft(draft: TaskDraft, now: Date): string | null {
   if (description.length < 12) return "Add a short description so helpers know what to do.";
   if (description.length > 1000) return "Keep the description under 1,000 characters.";
   if (!CATEGORY_LABELS[draft.category]) return "Choose a task category.";
-  if (!getLocation(draft.locationId)) return "Choose a valid location.";
-  if (draft.dropoffLocationId && draft.dropoffLocationId === draft.locationId) {
-    return "Pickup and drop-off need to be different locations.";
+
+  // Places are coordinates now, so any address is valid. A draft may still
+  // carry catalogue ids from older callers or seeded data.
+  const pickup = draft.pickup ?? (draft.locationId ? placeFromLocationId(draft.locationId) : null);
+  if (!isUsablePlace(pickup)) return "Choose a pickup address.";
+  const dropoff = draft.dropoff ?? (draft.dropoffLocationId ? placeFromLocationId(draft.dropoffLocationId) : undefined);
+  if (dropoff && !isUsablePlace(dropoff)) return "Choose a valid drop-off address.";
+  if (dropoff && samePlace(pickup, dropoff)) {
+    return "Pickup and drop-off need to be different places.";
   }
   if (!Number.isFinite(draft.rewardCents) || draft.rewardCents < 100) {
     return "Set a reward of at least $1.00.";
@@ -422,14 +433,25 @@ export class DemoStore {
       const validationError = validateTaskDraft(input, now);
       if (validationError) return { ok: false, error: validationError };
 
+      // A typed address wins; the legacy ids are filled from it so preferences
+      // and older copy keep working.
+      const pickup = input.pickup ?? placeFromLocationId(input.locationId);
+      const dropoff = input.dropoff ?? (input.dropoffLocationId
+        ? placeFromLocationId(input.dropoffLocationId)
+        : undefined);
+
       const task: Task = {
         id: newId("t"),
         requesterId: requester.id,
         title: input.title.trim(),
         description: input.description.trim(),
         category: input.category,
-        locationId: input.locationId,
-        dropoffLocationId: input.dropoffLocationId || undefined,
+        locationId: input.locationId ?? nearestLocationId(pickup),
+        dropoffLocationId: dropoff
+          ? input.dropoffLocationId ?? nearestLocationId(dropoff)
+          : undefined,
+        pickup,
+        dropoff,
         rewardCents: Math.round(input.rewardCents),
         acceptanceMode: input.acceptanceMode,
         paymentMethod: input.paymentMethod ?? "stripe_card",

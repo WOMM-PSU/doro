@@ -9,6 +9,8 @@
 import type { TaskCategory } from "@/types";
 import { clamp01 } from "@/lib/format";
 import { distanceBetweenLocations, travelMinutes } from "@/lib/locations";
+import { placeDistance } from "@/lib/places";
+import type { TaskPlace } from "@/types";
 import { minutesUntil } from "@/lib/time";
 
 export interface RewardSample {
@@ -22,6 +24,9 @@ export interface PricingInput {
   deadline?: string;
   locationId?: string;
   dropoffLocationId?: string;
+  /** Exact places, preferred over the catalogue ids when present. */
+  pickup?: TaskPlace;
+  dropoff?: TaskPlace;
   expenseCents?: number;
   now?: Date;
   /** Completed rewards from this workspace, used to adjust the estimate. */
@@ -88,8 +93,9 @@ export const PRICING_CONFIG: Record<
 export const TYPICAL_APPROACH_MILES = 0.25;
 
 export function estimateTaskTravelMinutes(input: PricingInput): number {
-  const legMiles =
-    input.locationId && input.dropoffLocationId
+  const legMiles = input.pickup && input.dropoff
+    ? placeDistance(input.pickup, input.dropoff)
+    : input.locationId && input.dropoffLocationId
       ? distanceBetweenLocations(input.locationId, input.dropoffLocationId)
       : 0;
   return travelMinutes(TYPICAL_APPROACH_MILES + legMiles, "walk");
@@ -104,7 +110,7 @@ export function recommendReward(input: PricingInput): RewardRecommendation {
   const now = input.now ?? new Date();
   const taskMinutes = Math.max(5, Math.round(input.estimatedMinutes));
   const travel = estimateTaskTravelMinutes(input);
-  const waiting = input.dropoffLocationId ? 4 : 0;
+  const waiting = input.dropoff || input.dropoffLocationId ? 4 : 0;
   const totalMinutes = taskMinutes + travel + waiting;
   const effortHours = totalMinutes / 60;
 

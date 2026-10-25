@@ -38,6 +38,7 @@ The composer's “one sentence is enough” box is read by a hosted model throug
 ## What's implemented
 
 - **Marketplace rules** in `src/features/store.ts`: eligible acceptances, offers, handoff codes, task-scoped chat, cancellation, disputes, reviews and notifications. Illegal transitions are rejected by one table.
+- **Any address, not a dropdown.** Pickup and drop-off are type-ahead address fields: the twelve campus places are matched locally, everything else is geocoded through `/api/geocode` (Photon/OSM) and stored as coordinates on the task. Distance, pricing, matching and the OSRM route all read those coordinates; the nearest campus spot is kept as a legacy id for preferences and copy. Results outside a 60-mile service radius are rejected so a typo can't price a 600-mile delivery.
 - **Explainable matching** across distance, timing, preferences, reward, skills and reliability, with every contribution visible.
 - **Fair reward estimates** from category, effort, travel, urgency and completed-task history.
 - **Sentence composer**: describe a task in one sentence. A hosted model (Groq) reads it into title, category, places, deadline, duration and reward, and a deterministic parser does the arithmetic. Offline, unconfigured or erroring, the parser alone fills the form.
@@ -57,6 +58,7 @@ Everything below is optional. Copy the values into `.env` (already git-ignored) 
 | `GROQ_API_KEY` | Server-only Groq key for the composer's sentence helper. Without it the deterministic parser fills the form. |
 | `GROQ_MODELS` | Optional comma-separated model chain. Defaults to `qwen/qwen3.8-27b`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `llama-3.1-8b-instant`. |
 | `NEXT_PUBLIC_CARTO_API_KEY` | CARTO Voyager basemap tiles. Without it the map falls back to OpenStreetMap. |
+| `PHOTON_BASE_URL` | Optional self-hosted Photon endpoint for address search. Defaults to `https://photon.komoot.io`. |
 | `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for cloud sync. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only key used by `/api/sync`. Never expose it with a `NEXT_PUBLIC_` prefix. |
 | `SUPABASE_WORKSPACE` | Optional workspace name; defaults to `campus`. |

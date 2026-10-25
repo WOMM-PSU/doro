@@ -14,12 +14,12 @@ import {
 import type { RankedTask } from "@/features/selectors";
 import {
   LOCATIONS,
-  distanceBetweenLocations,
-  getLocation,
   mapPosition,
   travelMinutes,
   type TravelModeId,
 } from "@/lib/locations";
+import { mapPositionOf, placeDistance, taskDropoff, taskPickup } from "@/lib/places";
+import type { TaskPlace } from "@/types";
 import { formatMiles, formatMoney, formatTravel } from "@/lib/format";
 import { cn, useToast } from "@/components/ui";
 
@@ -121,14 +121,20 @@ export function MapPanel({
     [tasks, selectedId],
   );
 
-  const byLocation = useMemo(() => {
+  // Pins sit at the exact pickup coordinates, so two tasks at different
+  // addresses never collapse into one campus landmark.
+  const { byLocation, placeByKey } = useMemo(() => {
     const grouped = new Map<string, RankedTask[]>();
+    const places = new Map<string, TaskPlace>();
     for (const ranked of tasks) {
-      const list = grouped.get(ranked.task.locationId) ?? [];
+      const place = taskPickup(ranked.task);
+      const key = `${place.lat.toFixed(5)},${place.lng.toFixed(5)}`;
+      const list = grouped.get(key) ?? [];
       list.push(ranked);
-      grouped.set(ranked.task.locationId, list);
+      grouped.set(key, list);
+      places.set(key, place);
     }
-    return grouped;
+    return { byLocation: grouped, placeByKey: places };
   }, [tasks]);
 
   // Initialize real Leaflet map instance on mount
@@ -296,9 +302,10 @@ export function MapPanel({
 
     // 2. Active task route polyline (pickup -> dropoff)
     const activeTask = selectedRanked?.task;
-    if (activeTask && activeTask.dropoffLocationId) {
-      const pickupLoc = getLocation(activeTask.locationId);
-      const dropoffLoc = getLocation(activeTask.dropoffLocationId);
+    const activeDropoff = activeTask ? taskDropoff(activeTask) : undefined;
+    if (activeTask && activeDropoff) {
+      const pickupLoc = taskPickup(activeTask);
+      const dropoffLoc = activeDropoff;
 
       const routeLine = L.polyline(
         [
@@ -339,7 +346,7 @@ export function MapPanel({
 
       const dropIcon = L.divIcon({
         className: "doro-dropoff-pin",
-        html: `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#d7ff65;color:#17191c;border:1.5px solid #17191c;border-radius:999px;padding:2px 7px;font-size:9.5px;font-weight:700;box-shadow:0 2px 8px rgba(23,25,28,0.22);white-space:nowrap;">Drop · ${dropoffLoc.shortLabel}</div>`,
+        html: `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#d7ff65;color:#17191c;border:1.5px solid #17191c;border-radius:999px;padding:2px 7px;font-size:9.5px;font-weight:700;box-shadow:0 2px 8px rgba(23,25,28,0.22);white-space:nowrap;">Drop · ${dropoffLoc.label}</div>`,
         iconSize: [0, 0],
       });
       L.marker([dropoffLoc.lat, dropoffLoc.lng], {
@@ -349,8 +356,12 @@ export function MapPanel({
     }
 
     // 3. Interactive task reward pins
-    for (const [locationId, group] of byLocation.entries()) {
-      const baseLoc = getLocation(locationId);
+    for (const [placeKey, group] of byLocation.entries()) {
+      const baseLoc = placeByKey.get(placeKey) ?? {
+        label: "Campus",
+        lat: PSU_CENTER[0],
+        lng: PSU_CENTER[1],
+      };
       const crowded = group.length > MAX_PINS_PER_PLACE;
       const { visible, hidden } = pinsForPlace(group, selectedId, zoomedIn);
       visible.forEach((ranked, idx) => {
@@ -395,7 +406,7 @@ export function MapPanel({
         const offset = PLACE_OFFSET_PX[MAX_PINS_PER_PLACE - 1];
         const moreIcon = L.divIcon({
           className: "doro-more-pin",
-          html: `<button type="button" aria-label="Show ${hidden} more tasks at ${baseLoc.name}" style="transform:translate(calc(-50% + ${offset.x}px),calc(-50% + ${offset.y}px));display:inline-flex;align-items:center;background:#17191c;color:#d7ff65;border:1.5px solid #17191c;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;white-space:nowrap;">+${hidden}</button>`,
+          html: `<button type="button" aria-label="Show ${hidden} more tasks at ${baseLoc.label}" style="transform:translate(calc(-50% + ${offset.x}px),calc(-50% + ${offset.y}px));display:inline-flex;align-items:center;background:#17191c;color:#d7ff65;border:1.5px solid #17191c;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;white-space:nowrap;">+${hidden}</button>`,
           iconSize: [0, 0],
         });
         L.marker([baseLoc.lat, baseLoc.lng], { icon: moreIcon, zIndexOffset: 1100 })
@@ -415,7 +426,7 @@ export function MapPanel({
     if (!map || !selectedId) return;
     const found = tasks.find((r) => r.task.id === selectedId);
     if (!found) return;
-    const loc = getLocation(found.task.locationId);
+    const loc = taskPickup(found.task);
     map.panTo([loc.lat, loc.lng], { animate: true, duration: 0.35 });
   }, [selectedId, tasks]);
 
@@ -432,12 +443,9 @@ export function MapPanel({
       const map = leafletMapRef.current;
       if (!L || !map) return;
       const points = tasks.flatMap(({ task }) =>
-        [task.locationId, task.dropoffLocationId]
-          .filter((id): id is string => Boolean(id))
-          .map((id) => {
-            const loc = getLocation(id);
-            return L.latLng(loc.lat, loc.lng);
-          }),
+        [taskPickup(task), taskDropoff(task)]
+          .filter((place): place is NonNullable<typeof place> => Boolean(place))
+          .map((place) => L.latLng(place.lat, place.lng)),
       );
       if (points.length === 0) {
         map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate });
@@ -505,10 +513,11 @@ export function MapPanel({
   };
 
   // Campus Grid can't zoom, so a "+N" bubble there switches to the street map first.
-  const expandPlace = (locationId: string) => {
+  const expandPlace = (placeKey: string) => {
     const map = leafletMapRef.current;
     if (!map) return;
-    const loc = getLocation(locationId);
+    const loc = placeByKey.get(placeKey);
+    if (!loc) return;
     if (styleMode === "blueprint") setStyleMode(STREET_MODES[0]);
     map.setView([loc.lat, loc.lng], PIN_SPREAD_ZOOM + 0.5, { animate: true });
   };
@@ -519,17 +528,10 @@ export function MapPanel({
     );
   };
 
-  const activePickup = selectedRanked
-    ? getLocation(selectedRanked.task.locationId)
-    : null;
-  const activeDropoff =
-    selectedRanked?.task.dropoffLocationId
-      ? getLocation(selectedRanked.task.dropoffLocationId)
-      : null;
+  const activePickup = selectedRanked ? taskPickup(selectedRanked.task) : null;
+  const activeDropoff = selectedRanked ? taskDropoff(selectedRanked.task) ?? null : null;
   const activeMiles =
-    activePickup && activeDropoff
-      ? distanceBetweenLocations(activePickup.id, activeDropoff.id)
-      : 0;
+    activePickup && activeDropoff ? placeDistance(activePickup, activeDropoff) : 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-soft">
@@ -671,8 +673,8 @@ export function MapPanel({
               <div className="flex items-center gap-1.5 text-[10.5px] font-medium text-muted">
                 <Navigation className="size-3 shrink-0 text-ink" aria-hidden />
                 <span className="truncate font-semibold text-ink">
-                  {activePickup?.shortLabel}
-                  {activeDropoff ? ` → ${activeDropoff.shortLabel}` : ""}
+                  {activePickup?.label}
+                  {activeDropoff ? ` → ${activeDropoff.label}` : ""}
                 </span>
                 {activeMiles > 0 ? (
                   <span className="shrink-0 text-muted">
@@ -749,12 +751,9 @@ function CampusBlueprintUnderlay({
 }) {
   const selectedRanked =
     tasks.find((r) => r.task.id === selectedId) ?? tasks[0] ?? null;
-  const pickupPos = selectedRanked
-    ? mapPosition(getLocation(selectedRanked.task.locationId))
-    : null;
-  const dropoffPos = selectedRanked?.task.dropoffLocationId
-    ? mapPosition(getLocation(selectedRanked.task.dropoffLocationId))
-    : null;
+  const pickupPos = selectedRanked ? mapPositionOf(taskPickup(selectedRanked.task)) : null;
+  const dropoffPlace = selectedRanked ? taskDropoff(selectedRanked.task) : undefined;
+  const dropoffPos = dropoffPlace ? mapPositionOf(dropoffPlace) : null;
 
   return (
     <div className="absolute inset-0 size-full select-none bg-[#e9ede3]">
@@ -916,7 +915,7 @@ function CampusBlueprintUnderlay({
       {/* Interactive Pin Buttons when in Blueprint mode or before Leaflet tiles finish mounting */}
       {interactivePins
         ? Array.from(byLocation.entries()).flatMap(([locationId, group]) => {
-            const base = mapPosition(getLocation(locationId));
+            const base = mapPositionOf(taskPickup(group[0].task));
             const { visible, hidden } = pinsForPlace(group, chosenId, false);
             const pins = visible.map((ranked, index) => {
               const offset = PLACE_OFFSET_PX[index] ?? { x: 0, y: 0 };
@@ -960,7 +959,7 @@ function CampusBlueprintUnderlay({
                   key={`${locationId}-more`}
                   type="button"
                   onClick={() => onExpand(locationId)}
-                  aria-label={`Show ${hidden} more tasks at ${getLocation(locationId).name}`}
+                  aria-label={`Show ${hidden} more tasks at ${taskPickup(group[0].task).label}`}
                   className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-ink bg-ink px-2 py-1 text-[10px] font-semibold text-lime shadow-soft transition-transform hover:scale-105"
                   style={{
                     left: `calc(${base.x}% + ${offset.x}px)`,
