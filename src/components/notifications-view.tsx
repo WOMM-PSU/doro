@@ -1,14 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Bell, CheckCheck, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Bell, BellRing, CheckCheck, SlidersHorizontal } from "lucide-react";
 import type { Notification } from "@/types";
 import { useDemo, useUi } from "@/components/providers";
 import { getNotifications, getTask, unreadCount } from "@/features/selectors";
 import { formatRelative, startOfDay } from "@/lib/time";
 import { Button, EmptyState, cn, useToast } from "@/components/ui";
 import { NOTIFICATION_ICONS } from "@/components/icons";
+import {
+  disablePush,
+  enablePush,
+  getPushStatus,
+  type PushStatus,
+} from "@/lib/push-client";
 
 const TONE_BY_KIND: Partial<Record<Notification["kind"], string>> = {
   MATCH: "bg-lime-soft text-[#4d6528]",
@@ -30,9 +36,43 @@ export function NotificationsView() {
   const ui = useUi();
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
   const notifications = getNotifications(state, user.id);
   const unread = unreadCount(state, user.id);
   const visible = filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
+
+  useEffect(() => {
+    let active = true;
+    getPushStatus().then((status) => {
+      if (active) setPushStatus(status);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (pushStatus?.state === "subscribed") {
+        await disablePush();
+        setPushStatus(await getPushStatus());
+        toast("Browser push turned off. In-app updates still arrive.", "default");
+      } else {
+        const result = await enablePush();
+        if (!result.ok) {
+          toast(result.error ?? "Push couldn't be enabled.", "error");
+          setPushStatus(await getPushStatus());
+          return;
+        }
+        setPushStatus(await getPushStatus());
+        toast("Browser push enabled for this device.", "success");
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const groups = useMemo(() => {
     const map = new Map<string, Notification[]>();
@@ -77,6 +117,40 @@ export function NotificationsView() {
           </Button>
         </div>
       </header>
+
+      <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-lime-soft text-[#4d6528]">
+            <BellRing className="size-4" aria-hidden />
+          </span>
+          <div>
+            <p className="text-[12.5px] font-semibold text-ink">Browser push</p>
+            <p className="mt-0.5 max-w-md text-[10.5px] leading-relaxed text-muted">
+              {pushStatus?.detail ?? "Checking push support…"} Quiet hours and match notifications
+              are respected; the service worker only shows a push when the tab is in the background.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant={pushStatus?.state === "subscribed" ? "outline" : "lime"}
+          onClick={togglePush}
+          disabled={
+            pushBusy ||
+            !pushStatus ||
+            pushStatus.state === "unsupported" ||
+            pushStatus.state === "unconfigured" ||
+            pushStatus.state === "denied"
+          }
+          className="shrink-0 self-start sm:self-auto"
+        >
+          {pushBusy
+            ? "Working…"
+            : pushStatus?.state === "subscribed"
+              ? "Turn off push"
+              : "Enable push"}
+        </Button>
+      </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex items-center gap-1 rounded-full border border-line bg-surface p-1">

@@ -16,6 +16,7 @@ import { loadState } from "@/lib/persistence";
 import { createStateRepository } from "@/lib/repository";
 import { activeUser } from "@/features/selectors";
 import { DoroLogo } from "@/components/brand";
+import { PushBridge } from "@/components/push-bridge";
 import {
   ToastContext,
   ToastViewport,
@@ -129,6 +130,7 @@ function HydratedDemoProvider({
     <DemoContext.Provider value={value}>
       <ToastContext.Provider value={{ toast }}>
         <UiProvider>{children}</UiProvider>
+        <PushBridge />
         <ToastViewport toasts={toasts} />
       </ToastContext.Provider>
     </DemoContext.Provider>
