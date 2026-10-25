@@ -30,6 +30,7 @@ import {
 } from "@/features/selectors";
 import { CATEGORY_LABELS } from "@/features/matching";
 import { formatMoney } from "@/lib/format";
+import { paymentLabels } from "@/lib/payment-labels";
 import { formatDeadline, formatRelative } from "@/lib/time";
 import {
   Avatar,
@@ -361,7 +362,7 @@ function ActivityRow({ task, state, user }: { task: Task; state: DemoState; user
           )}
           {payment ? (
             <span className="ml-1 hidden rounded-full bg-muted-surface px-1.5 py-0.5 text-[9px] font-medium text-muted sm:inline">
-              {payment.state === "DEMO_RELEASED" ? "demo paid out" : "demo authorized"}
+              {paymentLabels({ state: payment.state, paymentMethod: payment.paymentMethod ?? task.paymentMethod }).status}
             </span>
           ) : null}
         </div>
