@@ -317,6 +317,8 @@ export class DemoStore {
 
   resetDemo(): ActionResult<DemoState> {
     const fresh = createSeedState(new Date());
+    // Resetting restores the sample data, not the first-run welcome.
+    fresh.onboardingDismissed = this.state.onboardingDismissed;
     this.state = fresh;
     if (this.persist) this.storageAvailable = saveState(fresh);
     this.emit();

@@ -390,6 +390,16 @@ describe("demo integrity", () => {
     expect(state.payments.filter((p) => p.taskId === "t-notebook")).toHaveLength(0);
   });
 
+  it("keeps the welcome dismissed across a reset", () => {
+    const store = makeStore();
+    expect(store.getSnapshot().onboardingDismissed).toBe(false);
+    store.resetDemo();
+    expect(store.getSnapshot().onboardingDismissed).toBe(false);
+    store.dismissOnboarding();
+    store.resetDemo();
+    expect(store.getSnapshot().onboardingDismissed).toBe(true);
+  });
+
   it("never claims a real payout in demo payment copy", () => {
     const state = createSeedState();
     for (const payment of state.payments) {
