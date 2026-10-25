@@ -37,7 +37,7 @@ export default function NotFound() {
         </Link>
       </div>
       {DEMO_MODE ? (
-        <p className="mt-8 text-[10px] text-muted">DEMO MODE · No real payments or accounts.</p>
+        <p className="mt-8 text-[10px] text-muted">No real payments or accounts.</p>
       ) : null}
     </main>
   );

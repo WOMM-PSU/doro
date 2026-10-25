@@ -136,7 +136,7 @@ export function ProfileView() {
       <header>
         <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
           <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
-          {DEMO_MODE ? "Your account · demo" : "Your account"}
+          Your account
         </div>
         <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[38px]">
           Profile
@@ -156,11 +156,10 @@ export function ProfileView() {
               className="ring-4 ring-surface"
             />
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              {DEMO_MODE ? <Pill tone="lime">Demo persona</Pill> : null}
               {user.verified ? (
                 <Pill tone="success">
                   <BadgeCheck className="size-3" aria-hidden />
-                  {DEMO_MODE ? "Verified demo profile" : "Verified .edu email"}
+                  Verified
                 </Pill>
               ) : (
                 <Pill tone="neutral">Not verified</Pill>
@@ -227,8 +226,7 @@ export function ProfileView() {
             </div>
           </dl>
           <p className="mt-2 text-[10px] leading-relaxed text-muted">
-            Reputation combines this demo window with a seeded history. A rating is an indicator, not
-            proof of identity or safety.
+            Based on tasks completed and ratings received.
           </p>
         </div>
       </section>
@@ -240,8 +238,7 @@ export function ProfileView() {
               <div>
                 <h2 className="text-[15px] font-semibold text-ink">Discovery preferences</h2>
                 <p className="mt-0.5 max-w-md text-[11.5px] leading-relaxed text-muted">
-                  These feed Doro Match, set your eligibility radius, and control match
-                  notifications. Saving updates Discover immediately.
+                  Used to rank tasks and send match notifications.
                 </p>
               </div>
               {dirty ? (
@@ -310,9 +307,6 @@ export function ProfileView() {
                     }
                     className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted-surface accent-[#17191c]"
                   />
-                  <p className="mt-1 text-[10px] text-muted">
-                    Used for match notifications and reward scoring.
-                  </p>
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-2">
@@ -338,9 +332,6 @@ export function ProfileView() {
                     }
                     className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted-surface accent-[#17191c]"
                   />
-                  <p className="mt-1 text-[10px] text-muted">
-                    Tasks beyond this route distance are hidden from you.
-                  </p>
                 </div>
               </div>
 
@@ -363,9 +354,6 @@ export function ProfileView() {
                     ]}
                   />
                 </div>
-                <p className="mt-1 text-[10px] text-muted">
-                  Travel estimates use this mode with a fixed overhead. They are approximate.
-                </p>
               </div>
 
               <div className="space-y-3 border-t border-line pt-4">

@@ -54,7 +54,7 @@ export function TaskCard({
         "group relative flex h-full flex-col rounded-2xl border bg-surface p-4 transition-all duration-200 sm:p-5",
         selected
           ? "border-ink ring-1 ring-ink/80"
-          : "border-line hover:-translate-y-0.5 hover:border-[#d4d8cd] hover:shadow-soft",
+          : "border-line hover:border-[#d4d8cd] hover:shadow-soft",
       )}
       aria-label={`${task.title}, ${task.rewardCents / 100} dollars`}
     >
@@ -90,11 +90,7 @@ export function TaskCard({
                 <Sparkles className="size-3" aria-hidden />
                 Best match
               </Pill>
-            ) : (
-              <span className="tabular rounded-full bg-[#f4f6ef] px-2 py-1 text-[10px] font-semibold text-[#57702a]">
-                {match.score}% match
-              </span>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -116,21 +112,12 @@ export function TaskCard({
             <Clock3 className="size-3.5" aria-hidden />
             ~{totalMinutes} min total
           </span>
-        </div>
-
-        {!urgent ? (
-          <div className="mt-1.5 flex items-center gap-1 text-[11.5px] text-muted">
-            <CalendarDays className="size-3.5" aria-hidden />
-            {formatDeadline(task.deadline)}
-          </div>
-        ) : null}
-
-        <div className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-[#f7faf0] px-2.5 py-1.5 text-[11px] leading-snug text-[#4d6528]">
-          <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden />
-          <span className="line-clamp-2">
-            {match.explanation[0]}
-            {match.explanation[1] ? ` · ${match.explanation[1]}` : ""}
-          </span>
+          {!urgent ? (
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays className="size-3.5" aria-hidden />
+              {formatDeadline(task.deadline)}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -139,7 +126,7 @@ export function TaskCard({
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <Money cents={task.rewardCents} size="lg" />
             <span className="text-[10.5px] font-medium text-muted">
-              {task.acceptanceMode === "offers" ? "or make an offer" : "fixed reward"}
+              {task.acceptanceMode === "offers" ? "Open to offers" : "Fixed price"}
               {task.paymentMethod === "cash_handoff" ? " · cash" : ""}
             </span>
           </div>
@@ -178,16 +165,6 @@ export function TaskCard({
             </Button>
           ) : (
             <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  onSelect?.(task.id);
-                  ui.openTask(task.id);
-                }}
-              >
-                View
-              </Button>
               {task.acceptanceMode === "fixed" ? (
                 <Button
                   size="sm"

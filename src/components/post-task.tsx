@@ -600,7 +600,7 @@ export function PostTaskDialog() {
             </div>
             <p className="mt-4 text-[10px] text-muted">
               {DEMO_MODE
-                ? "DEMO MODE · No real charge. Editing isn't available in this build; cancel and repost if plans change."
+                ? "No real charge. Editing isn't available here; cancel and repost to change it."
                 : "Editing isn't available yet; cancel and repost if plans change."}
             </p>
           </div>
@@ -967,7 +967,7 @@ export function PostTaskDialog() {
                   <h3 className="text-[13px] font-bold uppercase tracking-[0.1em] text-muted">
                     3 · Your reward
                   </h3>
-                  <span className="text-[10px] text-muted">USD · demo only</span>
+                  <span className="text-[10px] text-muted">USD</span>
                 </div>
 
                 <div className="rounded-2xl border border-line bg-[#fbfcf9] p-3.5">

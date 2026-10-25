@@ -150,17 +150,15 @@ export function ActivityView() {
           Your tasks
         </div>
         <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[38px]">
-          My activity
+          Activity
         </h1>
         <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted">
-          Everything you posted or accepted, with the next useful action in each state.
           {counts.needs > 0 ? (
             <span className="font-medium text-ink">
-              {" "}
               {counts.needs} {counts.needs === 1 ? "task needs" : "tasks need"} you.
             </span>
           ) : (
-            " Nothing needs you right now."
+            "Nothing needs you right now."
           )}
         </p>
       </header>
@@ -197,7 +195,7 @@ export function ActivityView() {
         </div>
         <div className="hidden items-center gap-1.5 text-[10.5px] text-muted sm:flex">
           <Banknote className="size-3.5" aria-hidden />
-          Demo ledger · simulated money only
+          Simulated payments
         </div>
       </div>
 
@@ -249,7 +247,7 @@ export function ActivityView() {
 
       <p className="text-center text-[10px] text-muted">
         {DEMO_MODE
-          ? "DEMO MODE · Simulated payments and sample data. Resetting restores everything."
+          ? "Sample data · payments are simulated. Resetting restores everything."
           : "Payment states are recorded per task. Contact the other person if something looks wrong."}
       </p>
     </div>

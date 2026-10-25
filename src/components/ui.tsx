@@ -141,7 +141,7 @@ export function Avatar({
       </span>
       {verified ? (
         <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[1px]">
-          <BadgeCheck className="size-4 text-ink" aria-label="Verified demo profile" />
+          <BadgeCheck className="size-4 text-ink" aria-label="Verified" />
         </span>
       ) : null}
     </span>

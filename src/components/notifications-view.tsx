@@ -304,7 +304,7 @@ export function NotificationsView() {
 
       <p className="text-center text-[10px] text-muted">
         {DEMO_MODE
-          ? "DEMO MODE · Notifications are stored in this browser, with optional web push on this device."
+          ? "Notifications are stored in this browser, with optional web push on this device."
           : "Browser notifications are opt-in and can be turned off at any time."}
       </p>
     </div>

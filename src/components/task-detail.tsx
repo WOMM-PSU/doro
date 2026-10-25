@@ -591,7 +591,10 @@ export function TaskDetailSheet() {
                       setHandoffError(null);
                     }}
                     placeholder="4-digit code"
-                    className="tabular h-10 max-w-[160px] text-center font-mono text-base tracking-[0.3em]"
+                    className={cn(
+                      "tabular h-10 w-full max-w-[190px] text-center font-mono",
+                      handoffInput ? "text-base tracking-[0.3em]" : "text-sm tracking-normal",
+                    )}
                     aria-invalid={Boolean(handoffError)}
                   />
                   <Button size="sm" variant="dark" onClick={handleHandoff} disabled={handoffInput.length !== 4}>
@@ -781,7 +784,7 @@ export function TaskDetailSheet() {
                     ? `${getUserStats(state, counterpart).rating?.toFixed(1)}★`
                     : "No reviews yet"}
                 </span>
-                <span>{counterpart.verified ? "Verified demo profile" : "Unverified demo profile"}</span>
+                <span>{counterpart.verified ? "Verified" : "Unverified"}</span>
               </div>
             </div>
           ) : isRequester ? (
@@ -1201,7 +1204,7 @@ export function TaskDetailSheet() {
 
           <p className="text-center text-[10px] text-muted">
             {DEMO_MODE
-              ? "DEMO MODE · Sample people, simulated payments. Nothing here is a real transaction."
+              ? "Sample data · payments are simulated, never charged."
               : "Payments are recorded against this task."}
           </p>
         </div>

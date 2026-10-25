@@ -23,7 +23,7 @@ export function Onboarding() {
       footer={
         <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
           <p className="text-[10.5px] leading-relaxed text-muted">
-            DEMO MODE · Four sample personas, simulated payments, no sign-up.
+Four sample personas · simulated payments · no sign-up.
           </p>
           <Button variant="lime" onClick={dismiss}>
             Start exploring

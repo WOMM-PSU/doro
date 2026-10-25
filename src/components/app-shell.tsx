@@ -8,7 +8,6 @@ import {
   Check,
   ClipboardList,
   Compass,
-  MapPin,
   Plus,
   RotateCcw,
   UserRound,
@@ -33,7 +32,7 @@ import { Onboarding } from "@/components/onboarding";
 
 const NAV = [
   { href: "/discover", label: "Discover", icon: Compass },
-  { href: "/activity", label: "My activity", icon: ClipboardList },
+  { href: "/activity", label: "Activity", icon: ClipboardList },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/profile", label: "Profile", icon: UserRound },
 ] as const;
@@ -79,22 +78,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link href="/discover" className="px-2" aria-label="Doro home">
           <DoroLogo size={30} onDark />
         </Link>
-        <div className="mt-5 flex items-center gap-1.5 px-2 text-[11px] font-medium text-white/45">
-          <MapPin className="size-3.5" aria-hidden />
-          University Park, PA
-        </div>
-
         <Button
           variant="lime"
-          className="mt-5 w-full justify-between px-4"
+          className="mt-6 w-full justify-between px-4"
           onClick={ui.openCompose}
         >
           <span className="inline-flex items-center gap-2">
             <Plus className="size-4" aria-hidden />
             Post a task
-          </span>
-          <span className="rounded-full bg-ink/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-            New
           </span>
         </Button>
 
@@ -151,9 +142,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="block truncate text-[13px] font-semibold">{user.name}</span>
               <span className="block truncate text-[11px] text-white/45">Switch persona</span>
             </span>
-            <span aria-hidden className="rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] text-white/60">
-              ⇄
-            </span>
           </button>
           ) : (
             <Link
@@ -174,11 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           )}
           {DEMO_MODE ? (
-            <p className="px-1 text-[10px] leading-relaxed text-white/35">
-              DEMO MODE · No real payments.
-              <br />
-              Sample people and simulated money.
-            </p>
+            <p className="px-1 text-[10px] text-white/30">Demo environment · no real charges</p>
           ) : null}
         </div>
       </aside>
@@ -189,10 +173,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <DoroLogo size={27} />
           </Link>
           <div className="flex items-center gap-1">
-            <span className="mr-1 hidden items-center gap-1 text-[11px] text-muted min-[380px]:flex">
-              <MapPin className="size-3" aria-hidden />
-              University Park
-            </span>
+            <button
+              type="button"
+              onClick={ui.openCompose}
+              aria-label="Post a task"
+              className="mr-0.5 flex size-9 items-center justify-center rounded-full bg-lime text-ink transition-transform active:scale-95"
+            >
+              <Plus className="size-4" aria-hidden />
+            </button>
             <Link
               href="/notifications"
               aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
@@ -230,15 +218,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      <button
-        type="button"
-        onClick={ui.openCompose}
-        className="fixed bottom-[86px] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-lime pl-3.5 pr-4 text-[13px] font-semibold text-ink shadow-lift transition-transform active:scale-95 lg:hidden"
-      >
-        <Plus className="size-4" aria-hidden />
-        Post a task
-      </button>
-
       <nav
         aria-label="Main"
         className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-2 pt-1.5 backdrop-blur-md lg:hidden"
@@ -263,7 +242,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <span className="absolute -right-0.5 top-0 size-2 rounded-full border border-surface bg-ink" />
                   ) : null}
                 </span>
-                {item.label === "My activity" ? "Activity" : item.label}
+                {item.label}
               </Link>
             );
           })}
@@ -341,14 +320,12 @@ function PersonaModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Switch demo persona"
-      description="Try both sides of the marketplace. Your tasks, messages and notifications stay exactly as they are."
+      title="Switch persona"
+      description="Try both sides of the marketplace. Your tasks, messages and notifications stay as they are."
       size="md"
       footer={
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <p className="text-[11px] leading-relaxed text-muted">
-            DEMO MODE · Sample people, simulated payments.
-          </p>
+          <p className="text-[11px] text-muted">Sample people, simulated payments.</p>
           <Button variant="outline" size="sm" onClick={onReset}>
             <RotateCcw className="size-3.5" aria-hidden />
             Reset demo

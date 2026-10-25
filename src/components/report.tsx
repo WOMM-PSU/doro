@@ -77,7 +77,7 @@ export function ReportDialog() {
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Person</p>
               <p className="mt-0.5 font-medium text-ink">{reportedUser.name}</p>
               <p className="text-[11px] text-muted">
-                {reportedUser.handle} · {reportedUser.verified ? "Verified demo profile" : "Unverified demo profile"}
+                {reportedUser.handle} · {reportedUser.verified ? "Verified" : "Unverified"}
               </p>
             </>
           ) : null}
@@ -118,8 +118,8 @@ export function ReportDialog() {
 
         <p className="flex items-start gap-1.5 rounded-lg bg-muted-surface px-3 py-2 text-[10.5px] leading-relaxed text-muted">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          Duplicate reports are blocked for 10 minutes. This demo stores reports locally and lets a
-          sample moderator mark them reviewed.
+          Duplicate reports are blocked for 10 minutes. Reports are stored locally and reviewed by a
+          moderator.
         </p>
       </div>
     </Modal>

@@ -219,7 +219,7 @@ export function AddressField({
       ) : null}
       {outOfRange && !busy && visible.length === 0 ? (
         <p className="mt-1 text-[11px] text-muted">
-          No nearby match. Doro covers the State College area for this demo.
+          No nearby match. Doro covers the State College area.
         </p>
       ) : null}
     </div>
