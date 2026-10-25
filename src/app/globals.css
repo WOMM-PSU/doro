@@ -20,10 +20,11 @@
   --color-danger: #a63d3d;
   --color-danger-soft: #fbe9e7;
 
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
-    Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
-    monospace;
+  /* System fonts on purpose: Inter and JetBrains Mono were listed first but
+     never loaded, so the look depended on whether a viewer had them installed. */
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --radius-xl: 18px;
   --radius-2xl: 24px;
