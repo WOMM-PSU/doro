@@ -32,6 +32,7 @@ import {
 import { getLocation } from "@/lib/locations";
 import { CATEGORY_LABELS } from "@/features/matching";
 import { formatMoney } from "@/lib/format";
+import { paymentLabels } from "@/lib/payment-labels";
 import { formatRelative } from "@/lib/time";
 import {
   Avatar,
@@ -48,13 +49,6 @@ import { CATEGORY_ICONS } from "@/components/icons";
 import { DEMO_MODE } from "@/lib/demo-mode";
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as (keyof typeof CATEGORY_LABELS)[];
-
-const PAYMENT_LABELS: Record<string, string> = {
-  DEMO_AUTHORIZED: "Authorized · simulated",
-  DEMO_RELEASED: "Payout recorded · simulated",
-  DEMO_REFUNDED: "Authorization released",
-  DEMO_DISPUTED: "Paused · disputed",
-};
 
 export function ProfileView() {
   const { state, user, store } = useDemo();
@@ -525,19 +519,32 @@ export function ProfileView() {
                 {payments.map((payment) => {
                   const task = getTask(state, payment.taskId);
                   const earned = payment.helperId === user.id;
+                  // Only a completed payout moves money; holds and cash due are pending,
+                  // and released holds never moved anything.
+                  const settled = payment.state === "DEMO_RELEASED";
+                  const released = payment.state === "DEMO_REFUNDED";
                   return (
                     <li key={payment.id} className="rounded-xl border border-line px-2.5 py-2">
                       <div className="flex items-start justify-between gap-2">
                         <p className="line-clamp-1 text-[11px] font-medium text-ink">
                           {task?.title ?? "Task"}
                         </p>
-                        <span className="tabular shrink-0 text-[11px] font-semibold text-ink">
-                          {earned ? "+" : "−"}
-                          {formatMoney(payment.rewardCents)}
+                        <span
+                          className={cn(
+                            "tabular shrink-0 text-[11px] font-semibold",
+                            settled ? "text-ink" : "text-muted",
+                            released && "line-through",
+                          )}
+                        >
+                          {settled ? (earned ? "+" : "−") : ""}
+                          {formatMoney(payment.totalCents ?? payment.rewardCents + (payment.expenseCents ?? 0))}
                         </span>
                       </div>
                       <p className="mt-0.5 flex items-center justify-between gap-2 text-[9.5px] text-muted">
-                        <span>{PAYMENT_LABELS[payment.state] ?? payment.state}</span>
+                        <span>
+                          {paymentLabels({ state: payment.state, paymentMethod: payment.paymentMethod ?? task?.paymentMethod }).status}
+                          {payment.expenseCents ? ` · incl. up to ${formatMoney(payment.expenseCents)} expenses` : ""}
+                        </span>
                         <span>{formatRelative(payment.updatedAt)}</span>
                       </p>
                     </li>
