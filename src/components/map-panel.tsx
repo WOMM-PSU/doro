@@ -27,15 +27,19 @@ type MapStyleMode = "voyager" | "osm" | "blueprint";
 const PSU_CENTER: [number, number] = [40.7982, -77.8588];
 const DEFAULT_ZOOM = 15;
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY;
+// CARTO tiles render an "API KEY REQUIRED" watermark without a key, so the
+// keyless default is the public OpenStreetMap street map.
+const STREET_MODES: Exclude<MapStyleMode, "blueprint">[] = CARTO_API_KEY
+  ? ["voyager", "osm"]
+  : ["osm"];
+const STYLE_CYCLE: MapStyleMode[] = [...STREET_MODES, "blueprint"];
 
 const TILE_SOURCES: Record<
   Exclude<MapStyleMode, "blueprint">,
   { url: string; attribution: string; subdomains?: string }
 > = {
   voyager: {
-    url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${
-      CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ""
-    }`,
+    url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY ?? ""}`,
     attribution: "&copy; OpenStreetMap &copy; CARTO",
     subdomains: "abcd",
   },
@@ -81,7 +85,7 @@ export function MapPanel({
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const leafletModuleRef = useRef<typeof import("leaflet") | null>(null);
 
-  const [styleMode, setStyleMode] = useState<MapStyleMode>("voyager");
+  const [styleMode, setStyleMode] = useState<MapStyleMode>(STREET_MODES[0]);
   const [tilesReady, setTilesReady] = useState(false);
 
   const selectedRanked = useMemo(
@@ -119,7 +123,7 @@ export function MapPanel({
           zoomSnap: 0.5,
         });
 
-        const source = TILE_SOURCES.voyager;
+        const source = TILE_SOURCES[STREET_MODES[0]];
         const tileLayer = L.tileLayer(source.url, {
           maxZoom: 19,
           subdomains: source.subdomains ?? "abc",
@@ -299,8 +303,8 @@ export function MapPanel({
   };
 
   const cycleMapStyle = () => {
-    setStyleMode((prev) =>
-      prev === "voyager" ? "osm" : prev === "osm" ? "blueprint" : "voyager",
+    setStyleMode(
+      (prev) => STYLE_CYCLE[(STYLE_CYCLE.indexOf(prev) + 1) % STYLE_CYCLE.length],
     );
   };
 
@@ -366,11 +370,11 @@ export function MapPanel({
               >
                 <Layers className="size-3" aria-hidden />
                 <span>
-                  {styleMode === "voyager"
-                    ? "Street"
-                    : styleMode === "osm"
-                      ? "OSM"
-                      : "Campus Grid"}
+                  {styleMode === "blueprint"
+                    ? "Campus Grid"
+                    : styleMode === STREET_MODES[0]
+                      ? "Street"
+                      : "OSM"}
                 </span>
               </button>
               <button
