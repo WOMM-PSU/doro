@@ -50,14 +50,6 @@ const TILE_SOURCES: Record<
   },
 };
 
-const JITTER_OFFSETS_DEG: [number, number][] = [
-  [0, 0],
-  [0.00038, 0.00052],
-  [-0.00038, -0.00048],
-  [0.00042, -0.00045],
-  [-0.00042, 0.00048],
-];
-
 /** More tasks than this at one place collapse into a "+N" bubble until zoomed in. */
 const MAX_PINS_PER_PLACE = 5;
 const PIN_SPREAD_ZOOM = 17;
@@ -79,12 +71,17 @@ function pinsForPlace(group: RankedTask[], selectedId: string | null, zoomedIn: 
   return { visible, hidden: group.length - visible.length };
 }
 
-const BLUEPRINT_OFFSET_PX = [
+/**
+ * Screen offsets for up to five pins at one place (the fifth slot holds the
+ * "+N" bubble). Pins are about 52×24px, so this grid keeps them from
+ * overlapping at any zoom level.
+ */
+const PLACE_OFFSET_PX = [
   { x: 0, y: 0 },
-  { x: 18, y: -10 },
-  { x: -18, y: -8 },
-  { x: 10, y: 15 },
-  { x: -12, y: 16 },
+  { x: -30, y: -26 },
+  { x: 30, y: -26 },
+  { x: -30, y: 26 },
+  { x: 30, y: 26 },
 ];
 
 export function MapPanel({
@@ -357,7 +354,9 @@ export function MapPanel({
       const crowded = group.length > MAX_PINS_PER_PLACE;
       const { visible, hidden } = pinsForPlace(group, selectedId, zoomedIn);
       visible.forEach((ranked, idx) => {
-        const [dLat, dLng] = crowded && zoomedIn ? spreadOffset(idx) : JITTER_OFFSETS_DEG[idx] ?? [0, 0];
+        const spread = crowded && zoomedIn;
+        const [dLat, dLng] = spread ? spreadOffset(idx) : [0, 0];
+        const offset = spread ? { x: 0, y: 0 } : PLACE_OFFSET_PX[idx] ?? { x: 0, y: 0 };
         const lat = baseLoc.lat + dLat;
         const lng = baseLoc.lng + dLng;
         const isSelected =
@@ -374,7 +373,7 @@ export function MapPanel({
 
         const pinIcon = L.divIcon({
           className: "doro-task-pin",
-          html: `<button type="button" aria-label="${selectedId === ranked.task.id ? "Open" : "Select"} ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}" style="transform:translate(-50%,-50%) ${scale};display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${border};border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;transition:transform 140ms ease;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:${dotColor};display:inline-block;"></span>${priceText}</button>`,
+          html: `<button type="button" aria-label="${selectedId === ranked.task.id ? "Open" : "Select"} ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}" style="transform:translate(calc(-50% + ${offset.x}px),calc(-50% + ${offset.y}px)) ${scale};display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${border};border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;transition:transform 140ms ease;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:${dotColor};display:inline-block;"></span>${priceText}</button>`,
           iconSize: [0, 0],
         });
 
@@ -393,13 +392,13 @@ export function MapPanel({
       });
 
       if (hidden > 0) {
-        const [dLat, dLng] = JITTER_OFFSETS_DEG[MAX_PINS_PER_PLACE - 1];
+        const offset = PLACE_OFFSET_PX[MAX_PINS_PER_PLACE - 1];
         const moreIcon = L.divIcon({
           className: "doro-more-pin",
-          html: `<button type="button" aria-label="Show ${hidden} more tasks at ${baseLoc.name}" style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;background:#17191c;color:#d7ff65;border:1.5px solid #17191c;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;white-space:nowrap;">+${hidden}</button>`,
+          html: `<button type="button" aria-label="Show ${hidden} more tasks at ${baseLoc.name}" style="transform:translate(calc(-50% + ${offset.x}px),calc(-50% + ${offset.y}px));display:inline-flex;align-items:center;background:#17191c;color:#d7ff65;border:1.5px solid #17191c;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;white-space:nowrap;">+${hidden}</button>`,
           iconSize: [0, 0],
         });
-        L.marker([baseLoc.lat + dLat, baseLoc.lng + dLng], { icon: moreIcon, zIndexOffset: 900 })
+        L.marker([baseLoc.lat, baseLoc.lng], { icon: moreIcon, zIndexOffset: 1100 })
           .on("click", () => map.setView([baseLoc.lat, baseLoc.lng], PIN_SPREAD_ZOOM + 0.5, { animate: true }))
           .addTo(markersLayer);
       }
@@ -920,7 +919,7 @@ function CampusBlueprintUnderlay({
             const base = mapPosition(getLocation(locationId));
             const { visible, hidden } = pinsForPlace(group, chosenId, false);
             const pins = visible.map((ranked, index) => {
-              const offset = BLUEPRINT_OFFSET_PX[index] ?? { x: 0, y: 0 };
+              const offset = PLACE_OFFSET_PX[index] ?? { x: 0, y: 0 };
               const selected = ranked.task.id === selectedId;
               return (
                 <button
@@ -955,7 +954,7 @@ function CampusBlueprintUnderlay({
               );
             });
             if (hidden > 0) {
-              const offset = BLUEPRINT_OFFSET_PX[MAX_PINS_PER_PLACE - 1];
+              const offset = PLACE_OFFSET_PX[MAX_PINS_PER_PLACE - 1];
               pins.push(
                 <button
                   key={`${locationId}-more`}

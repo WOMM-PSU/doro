@@ -57,25 +57,26 @@ const TABS: { value: TabValue; label: string }[] = [
 
 const TAB_STORAGE_KEY = "doro.activity.tab";
 
+function readSavedTab(): TabValue {
+  try {
+    const saved = window.sessionStorage.getItem(TAB_STORAGE_KEY);
+    if (TABS.some((t) => t.value === saved)) return saved as TabValue;
+  } catch {
+    // Storage can be unavailable (private mode); the default tab is fine.
+  }
+  return "needs";
+}
+
 const ACTIVE_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS", "AWAITING_CONFIRMATION"];
 
 export function ActivityView() {
   const { state, user } = useDemo();
   const ui = useUi();
-  const [tab, setTab] = useState<TabValue>("needs");
-  const tabsFade = useScrollFade<HTMLDivElement>();
-  const previousUser = useRef(user.id);
-
   // Remember the tab for this browser tab so coming back to Activity doesn't
   // reset it; switching persona still starts at "Needs you".
-  useEffect(() => {
-    try {
-      const saved = window.sessionStorage.getItem(TAB_STORAGE_KEY);
-      if (TABS.some((t) => t.value === saved)) setTab(saved as TabValue);
-    } catch {
-      // Storage can be unavailable (private mode); the default tab is fine.
-    }
-  }, []);
+  const [tab, setTab] = useState<TabValue>(readSavedTab);
+  const tabsFade = useScrollFade<HTMLDivElement>();
+  const previousUser = useRef(user.id);
 
   useEffect(() => {
     if (previousUser.current === user.id) return;
