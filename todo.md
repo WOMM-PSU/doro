@@ -87,4 +87,4 @@ This is the handoff list for the next agent working on Doro. Work through the fe
 ## Housekeeping
 
 - [ ] Add a README section covering `.env` keys (`STRIPE_SECRET_KEY`, `NEXT_PUBLIC_CARTO_API_KEY`, plus any added later) and the fact that everything works without them.
-- [ ] Bump `CURRENT_STATE_VERSION` (in persistence/seed) whenever the persisted shape changes, so old localStorage data gets reset cleanly.
+- [ ] Bump `CURRENT_STATE_VERSION` (defined in [`src/features/seed.ts`](src/features/seed.ts)) whenever the persisted shape changes in a breaking way, so old localStorage data gets reset cleanly.
