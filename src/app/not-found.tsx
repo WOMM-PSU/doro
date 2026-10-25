@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowLeft, Compass } from "lucide-react";
 import { DoroLogo } from "@/components/brand";
 
+import { DEMO_MODE } from "@/lib/demo-mode";
+
 export default function NotFound() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-6 text-center">
@@ -34,7 +36,9 @@ export default function NotFound() {
           Back to landing
         </Link>
       </div>
-      <p className="mt-8 text-[10px] text-muted">DEMO MODE · No real payments or accounts.</p>
+      {DEMO_MODE ? (
+        <p className="mt-8 text-[10px] text-muted">DEMO MODE · No real payments or accounts.</p>
+      ) : null}
     </main>
   );
 }

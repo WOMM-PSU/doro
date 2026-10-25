@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { DoroLogo, DoroMark } from "@/components/brand";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import { createSeedState } from "@/features/seed";
 import { calculateMatch } from "@/features/matching";
 import { getUser } from "@/features/selectors";
@@ -49,7 +50,7 @@ export default function LandingPage() {
             href="/discover"
             className="inline-flex h-10 items-center gap-1.5 rounded-full bg-ink px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-ink-soft"
           >
-            Open the demo
+            {DEMO_MODE ? "Open the demo" : "Open Doro"}
             <ArrowRight className="size-3.5" aria-hidden />
           </Link>
         </div>
@@ -87,7 +88,7 @@ export default function LandingPage() {
                   href="/discover"
                   className="inline-flex h-12 items-center gap-2 rounded-full bg-lime px-6 text-sm font-semibold text-ink transition-colors hover:bg-lime-deep"
                 >
-                  Open the live demo
+                  {DEMO_MODE ? "Open the live demo" : "Find a task"}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
                 <a
@@ -102,14 +103,23 @@ export default function LandingPage() {
                   <Check className="size-3.5 text-[#587d2a]" aria-hidden />
                   No sign-up or API keys
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#587d2a]" aria-hidden />
-                  Four demo personas
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#587d2a]" aria-hidden />
-                  Payments are simulated
-                </div>
+                {DEMO_MODE ? (
+                  <div className="flex items-center gap-1.5">
+                    <Check className="size-3.5 text-[#587d2a]" aria-hidden />
+                    Four demo personas
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Check className="size-3.5 text-[#587d2a]" aria-hidden />
+                    Built for University Park
+                  </div>
+                )}
+                {DEMO_MODE ? (
+                  <div className="flex items-center gap-1.5">
+                    <Check className="size-3.5 text-[#587d2a]" aria-hidden />
+                    Payments are simulated
+                  </div>
+                ) : null}
               </dl>
             </div>
 
@@ -214,7 +224,9 @@ export default function LandingPage() {
                 </div>
               </div>
               <p className="mt-6 text-center text-[9.5px] text-muted lg:text-left">
-                Sample task and a real Doro Match calculation · approximate demo locations
+                {DEMO_MODE
+                  ? "Sample task and a real Doro Match calculation · approximate demo locations"
+                  : "A task card with the live Doro Match calculation"}
               </p>
             </div>
           </div>
@@ -269,7 +281,7 @@ export default function LandingPage() {
                 step: "03",
                 icon: ShieldCheck,
                 title: "Meet, hand off, confirm",
-                body: "Message only inside the task, use a four-digit handoff code for deliveries, then confirm completion and leave a review. Payments stay simulated in the demo.",
+                body: "Message only inside the task, use a four-digit handoff code for deliveries, then confirm completion and leave a review. The reward is authorized before the handoff.",
               },
             ].map((item) => (
               <article key={item.step} className="rounded-2xl border border-line bg-surface p-5">
@@ -315,7 +327,7 @@ export default function LandingPage() {
                   <p className="text-[10.5px] leading-relaxed text-white/55">
                     Maya, Alex, Jordan and Sam are sample personas.
                     <br />
-                    Switch between them instantly in the demo.
+                    {DEMO_MODE ? "Switch between them instantly in the demo." : "Share the link with people nearby."}
                   </p>
                 </div>
               </div>
@@ -411,8 +423,9 @@ export default function LandingPage() {
                   There's probably someone nearby.
                 </h2>
                 <p className="mt-2 max-w-md text-[12.5px] leading-relaxed text-[#435225]">
-                  Open the demo as Maya, post a notebook delivery, then switch to Alex and complete
-                  the loop. Everything is local, seeded and ready.
+                  {DEMO_MODE
+                    ? "Open the demo as Maya, post a notebook delivery, then switch to Alex and complete the loop. Everything is local, seeded and ready."
+                    : "Post a notebook delivery, review offers, and complete the handoff with a nearby helper."}
                 </p>
               </div>
               <Link
@@ -435,8 +448,9 @@ export default function LandingPage() {
             <span>Get your stuff done.</span>
           </div>
           <p className="max-w-md leading-relaxed">
-            A hackathon demo. Fictional people, approximate campus locations and simulated payments.
-            No real money, identity verification or background checks.
+            {DEMO_MODE
+              ? "A hackathon demo. Fictional people, approximate campus locations and simulated payments. No real money, identity verification or background checks."
+              : "Campus locations and travel times are approximate. Use the task chat and handoff code to coordinate."}
           </p>
         </div>
       </footer>

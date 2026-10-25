@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { DemoState, Task, User } from "@/types";
 import { useDemo, useUi } from "@/components/providers";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import {
   canReviewTask,
   effectiveStatus,
@@ -214,7 +215,9 @@ export function ActivityView() {
       ) : null}
 
       <p className="text-center text-[10px] text-muted">
-        DEMO MODE · Simulated payments and sample data. Resetting restores everything.
+        {DEMO_MODE
+          ? "DEMO MODE · Simulated payments and sample data. Resetting restores everything."
+          : "Payment states are recorded per task. Contact the other person if something looks wrong."}
       </p>
     </div>
   );

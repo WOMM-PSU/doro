@@ -9,6 +9,7 @@ import { getNotifications, getTask, unreadCount } from "@/features/selectors";
 import { formatRelative, startOfDay } from "@/lib/time";
 import { Button, EmptyState, cn, useToast } from "@/components/ui";
 import { NOTIFICATION_ICONS } from "@/components/icons";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import {
   disablePush,
   enablePush,
@@ -302,7 +303,9 @@ export function NotificationsView() {
       </div>
 
       <p className="text-center text-[10px] text-muted">
-        DEMO MODE · Notifications are stored in this browser, not sent as push or SMS.
+        {DEMO_MODE
+          ? "DEMO MODE · Notifications are stored in this browser, with optional web push on this device."
+          : "Browser notifications are opt-in and can be turned off at any time."}
       </p>
     </div>
   );

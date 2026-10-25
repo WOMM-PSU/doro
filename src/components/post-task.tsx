@@ -30,6 +30,7 @@ import {
 import { inferTaskDetails, parseTaskSentence } from "@/features/task-suggestions";
 import { analyzeContent } from "@/features/moderation";
 import { getLocalLlmStatus, parseTaskWithLocalLlm, type LocalLlmStatus } from "@/lib/local-llm";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import { LOCATIONS, getLocation } from "@/lib/locations";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
@@ -478,8 +479,9 @@ export function PostTaskDialog() {
               </Button>
             </div>
             <p className="mt-4 text-[10px] text-muted">
-              DEMO MODE · No real charge. Editing isn't available in this build; cancel and repost
-              if plans change.
+              {DEMO_MODE
+                ? "DEMO MODE · No real charge. Editing isn't available in this build; cancel and repost if plans change."
+                : "Editing isn't available yet; cancel and repost if plans change."}
             </p>
           </div>
         ) : (

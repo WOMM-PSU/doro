@@ -66,6 +66,7 @@ import {
 } from "@/features/selectors";
 import { calculateMatch, CATEGORY_LABELS } from "@/features/matching";
 import { analyzeMessage } from "@/features/moderation";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import { distanceBetweenLocations, getLocation, travelMinutes } from "@/lib/locations";
 import {
   captureStripeEscrowHold,
@@ -1087,7 +1088,9 @@ export function TaskDetailSheet() {
           </section>
 
           <p className="text-center text-[10px] text-muted">
-            DEMO MODE · Sample people, simulated payments. Nothing here is a real transaction.
+            {DEMO_MODE
+              ? "DEMO MODE · Sample people, simulated payments. Nothing here is a real transaction."
+              : "Payments are recorded against this task."}
           </p>
         </div>
       </Modal>

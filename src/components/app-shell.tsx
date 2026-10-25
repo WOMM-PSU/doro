@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { User } from "@/types";
 import { useDemo, useUi } from "@/components/providers";
+import { DEMO_MODE } from "@/lib/demo-mode";
 import { DoroLogo } from "@/components/brand";
 import {
   Avatar,
@@ -135,6 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-3">
+          {DEMO_MODE ? (
           <button
             type="button"
             onClick={() => setPersonaOpen(true)}
@@ -155,11 +157,31 @@ export function AppShell({ children }: { children: ReactNode }) {
               ⇄
             </span>
           </button>
-          <p className="px-1 text-[10px] leading-relaxed text-white/35">
-            DEMO MODE · No real payments.
-            <br />
-            Sample people and simulated money.
-          </p>
+          ) : (
+            <Link
+              href="/profile"
+              className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition-colors hover:bg-white/[0.08]"
+            >
+              <Avatar
+                name={user.name}
+                initials={user.initials}
+                color={user.avatarColor}
+                size="sm"
+                verified={user.verified}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold">{user.name}</span>
+                <span className="block truncate text-[11px] text-white/45">Your profile</span>
+              </span>
+            </Link>
+          )}
+          {DEMO_MODE ? (
+            <p className="px-1 text-[10px] leading-relaxed text-white/35">
+              DEMO MODE · No real payments.
+              <br />
+              Sample people and simulated money.
+            </p>
+          ) : null}
         </div>
       </aside>
 
@@ -187,14 +209,20 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </span>
               ) : null}
             </Link>
-            <button
-              type="button"
-              onClick={() => setPersonaOpen(true)}
-              className="ml-0.5 rounded-full p-0.5"
-              aria-label={`Current persona: ${user.name}. Switch demo persona`}
-            >
-              <Avatar name={user.name} initials={user.initials} color={user.avatarColor} size="sm" />
-            </button>
+            {DEMO_MODE ? (
+              <button
+                type="button"
+                onClick={() => setPersonaOpen(true)}
+                className="ml-0.5 rounded-full p-0.5"
+                aria-label={`Current persona: ${user.name}. Switch demo persona`}
+              >
+                <Avatar name={user.name} initials={user.initials} color={user.avatarColor} size="sm" />
+              </button>
+            ) : (
+              <Link href="/profile" aria-label="Your profile" className="ml-0.5 rounded-full p-0.5">
+                <Avatar name={user.name} initials={user.initials} color={user.avatarColor} size="sm" />
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -245,17 +273,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {pathname.startsWith("/discover") && !state.onboardingDismissed ? <Onboarding /> : null}
+      {DEMO_MODE && pathname.startsWith("/discover") && !state.onboardingDismissed ? (
+        <Onboarding />
+      ) : null}
 
-      <PersonaModal
-        open={personaOpen}
-        onClose={() => setPersonaOpen(false)}
-        onSelect={switchPersona}
-        onReset={() => setResetOpen(true)}
-      />
+      {DEMO_MODE ? (
+        <PersonaModal
+          open={personaOpen}
+          onClose={() => setPersonaOpen(false)}
+          onSelect={switchPersona}
+          onReset={() => setResetOpen(true)}
+        />
+      ) : null}
 
       <Modal
-        open={resetOpen}
+        open={DEMO_MODE && resetOpen}
         onClose={() => setResetOpen(false)}
         title="Reset the demo?"
         description="This restores the seeded tasks, people, offers and messages. Anything you posted or changed in this browser will be removed."

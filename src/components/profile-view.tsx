@@ -45,6 +45,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { CATEGORY_ICONS } from "@/components/icons";
+import { DEMO_MODE } from "@/lib/demo-mode";
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as (keyof typeof CATEGORY_LABELS)[];
 
@@ -112,7 +113,7 @@ export function ProfileView() {
       <header>
         <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
           <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
-          Your account · demo
+          {DEMO_MODE ? "Your account · demo" : "Your account"}
         </div>
         <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[38px]">
           Profile
@@ -132,11 +133,11 @@ export function ProfileView() {
               className="ring-4 ring-surface"
             />
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <Pill tone="lime">Demo persona</Pill>
+              {DEMO_MODE ? <Pill tone="lime">Demo persona</Pill> : null}
               {user.verified ? (
                 <Pill tone="success">
                   <BadgeCheck className="size-3" aria-hidden />
-                  Verified demo profile
+                  {DEMO_MODE ? "Verified demo profile" : "Verified .edu email"}
                 </Pill>
               ) : (
                 <Pill tone="neutral">Not verified</Pill>
@@ -425,7 +426,7 @@ export function ProfileView() {
                   ))}
                 </div>
                 <p className="mt-1 text-[10px] text-muted">
-                  Skills stay fixed in this demo persona and feed the skills component of Doro Match.
+                  Skills feed the skills component of Doro Match.
                 </p>
               </div>
 
@@ -511,9 +512,9 @@ export function ProfileView() {
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
                 <Banknote className="size-3.5" aria-hidden />
-                Demo payment history
+                Payment history
               </h2>
-              <Pill tone="neutral">Simulated</Pill>
+              {DEMO_MODE ? <Pill tone="neutral">Simulated</Pill> : null}
             </div>
             {payments.length === 0 ? (
               <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -580,6 +581,7 @@ export function ProfileView() {
             </p>
           </section>
 
+          {DEMO_MODE ? (
           <section id="demo-controls" className="rounded-2xl border border-line bg-surface p-4">
             <h2 className="text-[13px] font-semibold text-ink">Demo controls</h2>
             <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted">
@@ -642,6 +644,7 @@ export function ProfileView() {
               Reset demo data
             </Button>
           </section>
+          ) : null}
 
           <section className="rounded-2xl border border-line bg-surface p-4">
             <div className="flex items-center justify-between gap-2">
@@ -710,7 +713,7 @@ export function ProfileView() {
           <div className="rounded-2xl border border-line bg-[#fbfcf9] p-4 text-[10.5px] leading-relaxed text-muted">
             <p className="flex items-center gap-1.5 font-semibold text-ink">
               <ShieldCheck className="size-3.5 text-[#587d2a]" aria-hidden />
-              Demo privacy note
+              Privacy note
             </p>
             <p className="mt-1">
               No exact live locations are broadcast. Task locations are approximate campus places,
@@ -721,7 +724,7 @@ export function ProfileView() {
       </div>
 
       <Modal
-        open={resetOpen}
+        open={DEMO_MODE && resetOpen}
         onClose={() => setResetOpen(false)}
         title="Reset the demo?"
         description="All tasks, messages, offers, reviews, reports and simulated payments return to the seeded state."
