@@ -21,6 +21,7 @@ import {
   CreditCard,
   Flag,
   HandCoins,
+  ImagePlus,
   Lock,
   MapPin,
   Navigation,
@@ -30,7 +31,14 @@ import {
   Star,
   Timer,
 } from "lucide-react";
-import type { Offer } from "@/types";
+import type { Offer, TaskAttachment } from "@/types";
+import {
+  deleteAttachmentBlob,
+  getAttachmentBlob,
+  prepareAttachmentBlob,
+  putAttachmentBlob,
+  validateAttachmentFile,
+} from "@/lib/attachment-store";
 import { useDemo, useUi } from "@/components/providers";
 import {
   canAcceptTask,
@@ -118,6 +126,7 @@ export function TaskDetailSheet() {
   const [handoffInput, setHandoffInput] = useState("");
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
+  const [uploading, setUploading] = useState<TaskAttachment["kind"] | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const taskId = task?.id;
@@ -127,6 +136,7 @@ export function TaskDetailSheet() {
     setHandoffInput("");
     setHandoffError(null);
     setMessageBody("");
+    setUploading(null);
     setOfferError(null);
     if (task) {
       setOfferAmount(String(task.rewardCents / 100));
@@ -201,6 +211,49 @@ export function TaskDetailSheet() {
       return;
     }
     setMessageBody("");
+  };
+
+  const handleProofFile = async (
+    file: File | undefined,
+    kind: TaskAttachment["kind"],
+  ) => {
+    if (!file) return;
+    const invalid = validateAttachmentFile(file);
+    if (invalid) {
+      toast(invalid, "error");
+      return;
+    }
+    setUploading(kind);
+    const storageKey =
+      typeof globalThis.crypto?.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : `a-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      const blob = await prepareAttachmentBlob(file);
+      await putAttachmentBlob(storageKey, blob);
+      const result = store.addTaskAttachment(task.id, {
+        kind,
+        name: file.name,
+        mimeType: blob.type || file.type,
+        size: blob.size,
+        storageKey,
+      });
+      if (!result.ok) {
+        await deleteAttachmentBlob(storageKey);
+        toast(result.error, "error");
+        return;
+      }
+      toast(
+        kind === "receipt"
+          ? "Receipt attached for the requester."
+          : "Drop-off photo attached.",
+        "success",
+      );
+    } catch {
+      toast("Couldn't save that image on this device.", "error");
+    } finally {
+      setUploading(null);
+    }
   };
 
   const handleHandoff = () => {
@@ -679,6 +732,89 @@ export function TaskDetailSheet() {
                 </p>
               </div>
             </div>
+          ) : null}
+
+          {(task.attachments && task.attachments.length > 0) ||
+          (isHelper && status === "IN_PROGRESS") ? (
+            <section className="rounded-2xl border border-line bg-surface p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                  <ImagePlus className="size-3.5" aria-hidden />
+                  Completion proof
+                </h3>
+                <span className="text-[10px] text-muted">
+                  {task.attachments?.length ?? 0}/6 images
+                </span>
+              </div>
+              <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                {isHelper
+                  ? "A drop-off photo and, if expenses apply, the receipt help the requester confirm. Images stay in this browser."
+                  : "Photos from the helper are stored on this device. Check them before confirming."}
+              </p>
+
+              {task.attachments && task.attachments.length > 0 ? (
+                <AttachmentGallery attachments={task.attachments} />
+              ) : null}
+
+              {isHelper && status === "IN_PROGRESS" ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-[#fbfcf9] px-3 py-2.5 text-left transition-colors hover:border-[#cfd3c9]",
+                      uploading !== null && "pointer-events-none opacity-60",
+                    )}
+                  >
+                    <ImagePlus className="size-4 shrink-0 text-muted" aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block text-[11.5px] font-medium text-ink">
+                        {uploading === "dropoff" ? "Saving…" : "Add drop-off photo"}
+                      </span>
+                      <span className="block text-[9.5px] text-muted">JPEG, PNG or WebP · 5 MB max</span>
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      disabled={uploading !== null}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = "";
+                        void handleProofFile(file, "dropoff");
+                      }}
+                    />
+                  </label>
+                  {task.expenseCents ? (
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-[#fbfcf9] px-3 py-2.5 text-left transition-colors hover:border-[#cfd3c9]",
+                        uploading !== null && "pointer-events-none opacity-60",
+                      )}
+                    >
+                      <Receipt className="size-4 shrink-0 text-muted" aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block text-[11.5px] font-medium text-ink">
+                          {uploading === "receipt" ? "Saving…" : "Add receipt"}
+                        </span>
+                        <span className="block text-[9.5px] text-muted">
+                          For up to {formatMoney(task.expenseCents)} in expenses
+                        </span>
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        disabled={uploading !== null}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.currentTarget.value = "";
+                          void handleProofFile(file, "receipt");
+                        }}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
           ) : null}
 
           {participant && task.helperId ? (
@@ -1635,5 +1771,75 @@ function DisputeDialog({
         />
       </Field>
     </Modal>
+  );
+}
+
+function AttachmentGallery({ attachments }: { attachments: TaskAttachment[] }) {
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {attachments.map((attachment) => (
+        <AttachmentTile key={attachment.id} attachment={attachment} />
+      ))}
+    </div>
+  );
+}
+
+function AttachmentTile({ attachment }: { attachment: TaskAttachment }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | undefined;
+    getAttachmentBlob(attachment.storageKey)
+      .then((blob) => {
+        if (!active) return;
+        if (!blob) {
+          setMissing(true);
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        if (active) setMissing(true);
+      });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.storageKey]);
+
+  const label = attachment.kind === "receipt" ? "Receipt" : "Drop-off photo";
+  const body = (
+    <>
+      <span className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg bg-muted-surface">
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={label} className="size-full object-cover" />
+        ) : (
+          <span className="text-[9.5px] text-muted">{missing ? "Image unavailable" : "Loading…"}</span>
+        )}
+      </span>
+      <span className="mt-1 block truncate text-[10px] font-medium text-ink">{label}</span>
+      <span className="block text-[9px] text-muted">
+        {Math.max(1, Math.round(attachment.size / 1024))} KB · this device only
+      </span>
+    </>
+  );
+
+  if (!url) {
+    return <div className="rounded-xl border border-line p-1.5">{body}</div>;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="rounded-xl border border-line p-1.5 transition-colors hover:border-[#cfd3c9]"
+      title={`Open ${label.toLowerCase()}`}
+    >
+      {body}
+    </a>
   );
 }

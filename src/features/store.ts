@@ -18,6 +18,7 @@ import type {
   ReportSubject,
   Review,
   Task,
+  TaskAttachment,
   TaskDraft,
   TaskEvent,
   TaskStatus,
@@ -798,6 +799,56 @@ export class DemoStore {
         now,
       );
       return { ok: true, data: task };
+    });
+  }
+
+  addTaskAttachment(
+    taskId: string,
+    input: {
+      kind: TaskAttachment["kind"];
+      name: string;
+      mimeType: string;
+      size: number;
+      storageKey: string;
+    },
+  ): ActionResult<TaskAttachment> {
+    return this.apply((draft, now) => {
+      const task = getTask(draft, taskId);
+      if (!task) return { ok: false, error: "Task not found." };
+      const user = this.currentUser(draft);
+      if (task.helperId !== user.id) {
+        return { ok: false, error: "Only the assigned helper can add completion proof." };
+      }
+      if (task.status !== "IN_PROGRESS") {
+        return { ok: false, error: "Add photos while the task is in progress." };
+      }
+      if (input.kind !== "dropoff" && input.kind !== "receipt") {
+        return { ok: false, error: "Choose a photo type." };
+      }
+      if (input.kind === "receipt" && !task.expenseCents) {
+        return { ok: false, error: "This task has no reimbursable expense to receipt." };
+      }
+      if (!["image/jpeg", "image/png", "image/webp"].includes(input.mimeType)) {
+        return { ok: false, error: "Use a JPEG, PNG, or WebP image." };
+      }
+      if (input.size <= 0 || input.size > 5 * 1024 * 1024) {
+        return { ok: false, error: "Keep images under 5 MB." };
+      }
+      if (task.attachments && task.attachments.length >= 6) {
+        return { ok: false, error: "This task already has six attachments." };
+      }
+      const attachment: TaskAttachment = {
+        id: newId("a"),
+        kind: input.kind,
+        name: input.name.slice(0, 120),
+        mimeType: input.mimeType,
+        size: input.size,
+        storageKey: input.storageKey,
+        createdAt: now,
+      };
+      task.attachments = [...(task.attachments ?? []), attachment];
+      task.updatedAt = now;
+      return { ok: true, data: attachment };
     });
   }
 

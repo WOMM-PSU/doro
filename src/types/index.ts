@@ -91,6 +91,19 @@ export interface User {
   isNew?: boolean;
 }
 
+export type AttachmentKind = "dropoff" | "receipt";
+
+/** Metadata only; the image bytes live in IndexedDB on this device. */
+export interface TaskAttachment {
+  id: string;
+  kind: AttachmentKind;
+  name: string;
+  mimeType: string;
+  size: number;
+  storageKey: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   requesterId: string;
@@ -117,6 +130,7 @@ export interface Task {
   expenseNote?: string;
   itemDescription?: string;
   instructions?: string;
+  attachments?: TaskAttachment[];
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

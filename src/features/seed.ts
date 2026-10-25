@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { atLocalTime, hoursFromNow } from "@/lib/time";
 
-export const CURRENT_STATE_VERSION = 4;
+export const CURRENT_STATE_VERSION = 5;
 
 const iso = (date: Date) => date.toISOString();
 
