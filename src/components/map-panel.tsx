@@ -20,7 +20,7 @@ import {
   travelMinutes,
   type TravelModeId,
 } from "@/lib/locations";
-import { formatMoney } from "@/lib/format";
+import { formatMiles, formatMoney, formatTravel } from "@/lib/format";
 import { cn, useToast } from "@/components/ui";
 
 type MapStyleMode = "voyager" | "osm" | "blueprint";
@@ -527,8 +527,8 @@ export function MapPanel({
                 </span>
                 {activeMiles > 0 ? (
                   <span className="shrink-0 text-muted">
-                    · {activeMiles.toFixed(2)} mi (~
-                    {travelMinutes(activeMiles, "walk")}m walk)
+                    · {formatMiles(activeMiles)} ·{" "}
+                    {formatTravel(travelMinutes(activeMiles, travelMode), travelMode)}
                   </span>
                 ) : null}
               </div>

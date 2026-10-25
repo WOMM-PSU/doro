@@ -14,7 +14,7 @@ import { getUserStats, type RankedTask } from "@/features/selectors";
 import { getLocation } from "@/lib/locations";
 import { CATEGORY_LABELS } from "@/features/matching";
 import { formatDeadline, formatShortDeadline } from "@/lib/time";
-import { formatMiles, formatMoney } from "@/lib/format";
+import { formatMiles, formatMoney, formatTravel } from "@/lib/format";
 import { useDemo, useUi } from "@/components/providers";
 import { Avatar, Button, Money, Pill, cn } from "@/components/ui";
 import { CATEGORY_ICONS } from "@/components/icons";
@@ -110,7 +110,7 @@ export function TaskCard({
           </span>
           <span className="inline-flex items-center gap-1">
             <Navigation className="size-3.5" aria-hidden />
-            {formatMiles(distanceMiles)} · ~{travelMinutes} min {travelMode}
+            {formatMiles(distanceMiles)} · {formatTravel(travelMinutes, travelMode)}
           </span>
           <span className="inline-flex items-center gap-1">
             <Clock3 className="size-3.5" aria-hidden />

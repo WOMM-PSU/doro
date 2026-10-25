@@ -1,5 +1,7 @@
 /** Formatting helpers shared across the UI. */
 
+import type { TravelMode } from "@/types";
+
 export function formatMoney(cents: number, opts?: { compact?: boolean }): string {
   const safe = Number.isFinite(cents) ? Math.max(0, Math.round(cents)) : 0;
   const dollars = safe / 100;
@@ -16,6 +18,18 @@ export function formatMiles(miles: number): string {
   if (!Number.isFinite(miles) || miles < 0) return "—";
   if (miles < 0.1) return "<0.1 mi";
   return `${miles.toFixed(1)} mi`;
+}
+
+const TRAVEL_WORDS: Record<TravelMode, string> = {
+  walk: "walk",
+  bike: "bike ride",
+  bus: "by bus",
+  car: "drive",
+};
+
+/** "~6 min walk", "~4 min bike ride", "~9 min by bus", "~3 min drive". */
+export function formatTravel(minutes: number, mode: TravelMode): string {
+  return `~${minutes} min ${TRAVEL_WORDS[mode] ?? TRAVEL_WORDS.walk}`;
 }
 
 export function formatDuration(minutes: number): string {
