@@ -86,6 +86,11 @@ export function DiscoverView() {
   }, [ranked, selectedPin]);
 
   const mode = MODES.find((m) => m.value === filters.mode) ?? MODES[0];
+  // Under the map, the picked pin's task comes first so it is never out of sight.
+  const mapList = useMemo(() => {
+    const picked = ranked.find((r) => r.task.id === selectedPin);
+    return picked ? [picked, ...ranked.filter((r) => r !== picked)] : ranked;
+  }, [ranked, selectedPin]);
   const activeFilterCount =
     (filters.category !== "all" ? 1 : 0) +
     (filters.minRewardCents > 0 ? 1 : 0) +
@@ -258,11 +263,11 @@ export function DiscoverView() {
                   </Button>
                 </div>
                 <div className="grid gap-3.5 min-[1500px]:grid-cols-2">
-                  {ranked.slice(0, 6).map((item, index) => (
+                  {mapList.map((item) => (
                     <TaskCard
                       key={item.task.id}
                       ranked={item}
-                      rank={index}
+                      rank={ranked.indexOf(item)}
                       mode={filters.mode}
                       selected={selectedPin === item.task.id}
                       onSelect={setSelectedPin}
