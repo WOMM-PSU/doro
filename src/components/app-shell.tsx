@@ -208,10 +208,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <button
         type="button"
         onClick={ui.openCompose}
-        aria-label="Post a task"
-        className="fixed bottom-[86px] right-4 z-40 flex size-14 items-center justify-center rounded-full bg-lime text-ink shadow-lift transition-transform active:scale-95 lg:hidden"
+        className="fixed bottom-[86px] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-lime pl-3.5 pr-4 text-[13px] font-semibold text-ink shadow-lift transition-transform active:scale-95 lg:hidden"
       >
-        <Plus className="size-6" aria-hidden />
+        <Plus className="size-4" aria-hidden />
+        Post a task
       </button>
 
       <nav
