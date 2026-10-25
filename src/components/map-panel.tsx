@@ -58,6 +58,27 @@ const JITTER_OFFSETS_DEG: [number, number][] = [
   [-0.00042, 0.00048],
 ];
 
+/** More tasks than this at one place collapse into a "+N" bubble until zoomed in. */
+const MAX_PINS_PER_PLACE = 5;
+const PIN_SPREAD_ZOOM = 17;
+
+/** Golden-angle spiral so any number of pins at one place spread out evenly. */
+function spreadOffset(index: number): [number, number] {
+  if (index === 0) return [0, 0];
+  const angle = index * 2.39996;
+  const radius = 0.0003 * Math.sqrt(index);
+  return [radius * Math.sin(angle), radius * 1.3 * Math.cos(angle)];
+}
+
+/** Pins to draw at one place: the selected task first, capped unless zoomed in. */
+function pinsForPlace(group: RankedTask[], selectedId: string | null, zoomedIn: boolean) {
+  const selected = group.find((r) => r.task.id === selectedId);
+  const ordered = selected ? [selected, ...group.filter((r) => r !== selected)] : group;
+  if (group.length <= MAX_PINS_PER_PLACE || zoomedIn) return { visible: ordered, hidden: 0 };
+  const visible = ordered.slice(0, MAX_PINS_PER_PLACE - 1);
+  return { visible, hidden: group.length - visible.length };
+}
+
 const BLUEPRINT_OFFSET_PX = [
   { x: 0, y: 0 },
   { x: 18, y: -10 },
@@ -92,6 +113,7 @@ export function MapPanel({
 
   const [styleMode, setStyleMode] = useState<MapStyleMode>(STREET_MODES[0]);
   const [mapReady, setMapReady] = useState(false);
+  const [zoomedIn, setZoomedIn] = useState(false);
   const [locating, setLocating] = useState(false);
   const [gestureHint, setGestureHint] = useState<string | null>(null);
   const hintTimerRef = useRef<number | undefined>(undefined);
@@ -148,6 +170,7 @@ export function MapPanel({
         });
 
         tileLayer.addTo(map);
+        map.on("zoomend", () => setZoomedIn(map.getZoom() >= PIN_SPREAD_ZOOM));
 
         const routeLayer = L.layerGroup().addTo(map);
         const markersLayer = L.layerGroup().addTo(map);
@@ -321,8 +344,10 @@ export function MapPanel({
     // 3. Interactive task reward pins
     for (const [locationId, group] of byLocation.entries()) {
       const baseLoc = getLocation(locationId);
-      group.slice(0, 5).forEach((ranked, idx) => {
-        const [dLat, dLng] = JITTER_OFFSETS_DEG[idx] ?? [0, 0];
+      const crowded = group.length > MAX_PINS_PER_PLACE;
+      const { visible, hidden } = pinsForPlace(group, selectedId, zoomedIn);
+      visible.forEach((ranked, idx) => {
+        const [dLat, dLng] = crowded && zoomedIn ? spreadOffset(idx) : JITTER_OFFSETS_DEG[idx] ?? [0, 0];
         const lat = baseLoc.lat + dLat;
         const lng = baseLoc.lng + dLng;
         const isSelected =
@@ -356,12 +381,24 @@ export function MapPanel({
 
         marker.addTo(markersLayer);
       });
+
+      if (hidden > 0) {
+        const [dLat, dLng] = JITTER_OFFSETS_DEG[MAX_PINS_PER_PLACE - 1];
+        const moreIcon = L.divIcon({
+          className: "doro-more-pin",
+          html: `<button type="button" aria-label="Show ${hidden} more tasks at ${baseLoc.name}" style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;background:#17191c;color:#d7ff65;border:1.5px solid #17191c;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;white-space:nowrap;">+${hidden}</button>`,
+          iconSize: [0, 0],
+        });
+        L.marker([baseLoc.lat + dLat, baseLoc.lng + dLng], { icon: moreIcon, zIndexOffset: 900 })
+          .on("click", () => map.setView([baseLoc.lat, baseLoc.lng], PIN_SPREAD_ZOOM + 0.5, { animate: true }))
+          .addTo(markersLayer);
+      }
     }
 
     return () => {
       cancelled = true;
     };
-  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen, travelMode, mapReady]);
+  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen, travelMode, mapReady, zoomedIn]);
 
   // Smoothly pan map when user selects a pin from the feed
   useEffect(() => {
@@ -427,6 +464,15 @@ export function MapPanel({
     );
   };
 
+  // Campus Grid can't zoom, so a "+N" bubble there switches to the street map first.
+  const expandPlace = (locationId: string) => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+    const loc = getLocation(locationId);
+    if (styleMode === "blueprint") setStyleMode(STREET_MODES[0]);
+    map.setView([loc.lat, loc.lng], PIN_SPREAD_ZOOM + 0.5, { animate: true });
+  };
+
   const cycleMapStyle = () => {
     setStyleMode(
       (prev) => STYLE_CYCLE[(STYLE_CYCLE.indexOf(prev) + 1) % STYLE_CYCLE.length],
@@ -463,6 +509,7 @@ export function MapPanel({
             selectedId={selectedId ?? selectedRanked?.task.id ?? null}
             chosenId={selectedId}
             onSelect={onSelect}
+            onExpand={expandPlace}
             onOpen={onOpen}
             interactivePins={!mapReady || styleMode === "blueprint"}
           />
@@ -641,6 +688,7 @@ function CampusBlueprintUnderlay({
   selectedId,
   chosenId,
   onSelect,
+  onExpand,
   onOpen,
   interactivePins,
 }: {
@@ -650,6 +698,7 @@ function CampusBlueprintUnderlay({
   /** The pin the viewer explicitly picked; tapping it again opens the task. */
   chosenId: string | null;
   onSelect: (taskId: string) => void;
+  onExpand: (locationId: string) => void;
   onOpen: (taskId: string) => void;
   interactivePins: boolean;
 }) {
@@ -823,7 +872,8 @@ function CampusBlueprintUnderlay({
       {interactivePins
         ? Array.from(byLocation.entries()).flatMap(([locationId, group]) => {
             const base = mapPosition(getLocation(locationId));
-            return group.slice(0, 5).map((ranked, index) => {
+            const { visible, hidden } = pinsForPlace(group, chosenId, false);
+            const pins = visible.map((ranked, index) => {
               const offset = BLUEPRINT_OFFSET_PX[index] ?? { x: 0, y: 0 };
               const selected = ranked.task.id === selectedId;
               return (
@@ -858,6 +908,25 @@ function CampusBlueprintUnderlay({
                 </button>
               );
             });
+            if (hidden > 0) {
+              const offset = BLUEPRINT_OFFSET_PX[MAX_PINS_PER_PLACE - 1];
+              pins.push(
+                <button
+                  key={`${locationId}-more`}
+                  type="button"
+                  onClick={() => onExpand(locationId)}
+                  aria-label={`Show ${hidden} more tasks at ${getLocation(locationId).name}`}
+                  className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-ink bg-ink px-2 py-1 text-[10px] font-semibold text-lime shadow-soft transition-transform hover:scale-105"
+                  style={{
+                    left: `calc(${base.x}% + ${offset.x}px)`,
+                    top: `calc(${base.y}% + ${offset.y}px)`,
+                  }}
+                >
+                  +{hidden}
+                </button>,
+              );
+            }
+            return pins;
           })
         : null}
     </div>
