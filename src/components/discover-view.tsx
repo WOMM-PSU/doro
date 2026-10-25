@@ -317,22 +317,25 @@ export function DiscoverView() {
 
         <aside className="hidden xl:block">
           <div className="sticky top-8 space-y-4">
-            <div>
-              <div className="mb-2.5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-ink">Around campus</h2>
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted">
-                  {ranked.length} pins
-                </span>
+            {/* Map view already shows the big map, so the sidebar one would be a duplicate. */}
+            {view !== "map" ? (
+              <div>
+                <div className="mb-2.5 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-ink">Around campus</h2>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted">
+                    {ranked.length} pins
+                  </span>
+                </div>
+                <MapPanel
+                  tasks={ranked}
+                  selectedId={selectedPin}
+                  onSelect={setSelectedPin}
+                  onOpen={ui.openTask}
+                  compact
+                  travelMode={user.preferences.travelMode}
+                />
               </div>
-              <MapPanel
-                tasks={ranked}
-                selectedId={selectedPin}
-                onSelect={setSelectedPin}
-                onOpen={ui.openTask}
-                compact
-                travelMode={user.preferences.travelMode}
-              />
-            </div>
+            ) : null}
 
             <MatchProfileCard />
           </div>
