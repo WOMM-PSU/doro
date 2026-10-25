@@ -1268,9 +1268,11 @@ function TaskActions({
               <Button variant="outline" onClick={onCancel} disabled={!cancelAllowed}>
                 Cancel task
               </Button>
-              <Button variant="dark" onClick={() => ui.closeTask()} className="hidden sm:inline-flex">
-                Back to browse
-              </Button>
+              <div className="hidden sm:block">
+                <Button variant="dark" onClick={() => ui.closeTask()}>
+                  Back to browse
+                </Button>
+              </div>
             </>
           ) : null}
           {startAllowed ? (
