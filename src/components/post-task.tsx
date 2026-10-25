@@ -27,8 +27,9 @@ import {
   rewardPosition,
   type RewardRecommendation,
 } from "@/features/pricing";
-import { inferTaskDetails } from "@/features/task-suggestions";
+import { inferTaskDetails, parseTaskSentence } from "@/features/task-suggestions";
 import { analyzeContent } from "@/features/moderation";
+import { getLocalLlmStatus, parseTaskWithLocalLlm, type LocalLlmStatus } from "@/lib/local-llm";
 import { LOCATIONS, getLocation } from "@/lib/locations";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
@@ -74,6 +75,9 @@ export function PostTaskDialog() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [sentence, setSentence] = useState("");
+  const [sentenceBusy, setSentenceBusy] = useState(false);
+  const [llmStatus, setLlmStatus] = useState<LocalLlmStatus | null>(null);
   const [category, setCategory] = useState<TaskCategory>("delivery");
   const [pickupId, setPickupId] = useState(user.homeLocationId);
   const [dropoffId, setDropoffId] = useState(
@@ -114,9 +118,35 @@ export function PostTaskDialog() {
         locationId: isDelivery ? pickupId : locationId,
         dropoffLocationId: isDelivery ? dropoffId : undefined,
         expenseCents,
+        history: state.tasks
+          .filter((task) => task.status === "COMPLETED")
+          .map((task) => ({
+            category: task.category,
+            rewardCents: task.agreedRewardCents ?? task.rewardCents,
+          })),
       }),
-    [category, estimatedMinutes, deadline, isDelivery, pickupId, dropoffId, locationId, expenseCents],
+    [
+      category,
+      estimatedMinutes,
+      deadline,
+      isDelivery,
+      pickupId,
+      dropoffId,
+      locationId,
+      expenseCents,
+      state.tasks,
+    ],
   );
+
+  useEffect(() => {
+    let active = true;
+    getLocalLlmStatus().then((status) => {
+      if (active) setLlmStatus(status);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const inference = useMemo(
     () => inferTaskDetails(`${title} ${description}`),
@@ -140,6 +170,8 @@ export function PostTaskDialog() {
   const resetAll = () => {
     setTitle("");
     setDescription("");
+    setSentence("");
+    setSentenceBusy(false);
     setCategory("delivery");
     setPickupId(user.homeLocationId);
     setDropoffId(user.homeLocationId === "hub" ? "pattee" : "hub");
@@ -238,6 +270,54 @@ export function PostTaskDialog() {
     setFormError(null);
     setPublishedTaskId(result.data.id);
     toast("Task published. Eligible helpers can see it now.", "success");
+  };
+
+  const applySentence = async () => {
+    const text = sentence.trim();
+    if (text.length < 8) {
+      toast("Describe the task in a sentence first.", "error");
+      return;
+    }
+    setSentenceBusy(true);
+    try {
+      const local = llmStatus?.ready ? await parseTaskWithLocalLlm(text) : null;
+      const parsed = local ?? parseTaskSentence(text);
+      if (!parsed) {
+        toast("Couldn't read that sentence. Add what, where, and when.", "error");
+        return;
+      }
+      if (parsed.title) setTitle(parsed.title);
+      if (parsed.description) setDescription(parsed.description);
+      setCategory(parsed.category);
+      setEstimatedMinutes(parsed.estimatedMinutes);
+      setDurationTouched(true);
+      if (parsed.rewardCents) {
+        setRewardInput((parsed.rewardCents / 100).toFixed(2));
+        setRewardTouched(true);
+      }
+      if (parsed.dropoffLocationId) {
+        setPickupId(parsed.locationId ?? pickupId);
+        setDropoffId(parsed.dropoffLocationId);
+      } else if (parsed.locationId) {
+        setLocationId(parsed.locationId);
+        setPickupId(parsed.locationId);
+      }
+      if (parsed.deadline) {
+        setPreset("custom");
+        setCustomDeadline(toDateTimeLocalValue(new Date(parsed.deadline)));
+      }
+      setErrors({});
+      toast(
+        local
+          ? "Filled from the on-device model. Review anything it guessed."
+          : parsed.source === "rules"
+            ? "Filled with the local rule parser. Review before posting."
+            : "Filled the form. Review before posting.",
+        "default",
+      );
+    } finally {
+      setSentenceBusy(false);
+    }
   };
 
   const applyInference = () => {
@@ -420,6 +500,44 @@ export function PostTaskDialog() {
                 </div>
               ) : null}
 
+              <section className="rounded-2xl border border-[#dcebb0] bg-lime-soft/60 p-3.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="size-4 text-[#587d2a]" aria-hidden />
+                  <h3 className="text-[12.5px] font-semibold text-ink">One sentence is enough</h3>
+                </div>
+                <p className="mt-0.5 text-[10.5px] leading-relaxed text-[#5f6f45]">
+                  Try “Bring my charger from Pattee to East Halls by 4pm for $6.”
+                </p>
+                <Textarea
+                  value={sentence}
+                  onChange={(event) => setSentence(event.target.value)}
+                  maxLength={400}
+                  rows={2}
+                  className="mt-2 min-h-[58px] bg-surface text-[12.5px]"
+                  placeholder="What do you need, where, and by when?"
+                  aria-label="Describe the task in one sentence"
+                />
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="min-w-0 text-[10px] leading-relaxed text-[#5f6f45]">
+                    <span className="font-semibold text-ink">
+                      {llmStatus ? llmStatus.label : "Checking this browser…"}
+                    </span>
+                    {llmStatus ? ` · ${llmStatus.detail}` : null}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="dark"
+                    onClick={applySentence}
+                    disabled={sentenceBusy || sentence.trim().length < 8}
+                    className="shrink-0"
+                  >
+                    <Sparkles className="size-3.5" aria-hidden />
+                    {sentenceBusy ? "Reading…" : "Fill the form"}
+                  </Button>
+                </div>
+              </section>
+
               <section className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[13px] font-bold uppercase tracking-[0.1em] text-muted">
@@ -473,7 +591,7 @@ export function PostTaskDialog() {
                         Use a suggestion · {CATEGORY_LABELS[inference.category]} · ~{inference.estimatedMinutes} min
                       </span>
                       <span className="mt-0.5 block text-[10.5px] leading-relaxed text-[#5f6f45]">
-                        {inference.reason} Rule-based on your words — not an AI service.
+                        {inference.reason} A rule-based hint from your words; no network call.
                       </span>
                     </span>
                     <span className="text-[10px] font-semibold text-ink underline underline-offset-2">Apply</span>
@@ -726,7 +844,7 @@ export function PostTaskDialog() {
                   <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
                     Typical around {formatMoney(recommendation.typicalCents)} for ~
                     {recommendation.totalMinutes} min of effort and travel. Based on category, time,
-                    travel and urgency — not live market data.
+                    travel, urgency and completed tasks — not live market data.
                   </p>
                 </div>
 

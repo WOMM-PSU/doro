@@ -94,6 +94,34 @@ describe("reward recommendation", () => {
     expect(rec.typicalCents).toBeGreaterThan(0);
   });
 
+  it("adjusts from completed rewards once there are enough samples", () => {
+    const base = recommendReward({ category: "delivery", estimatedMinutes: 20, now });
+    const history = Array.from({ length: 5 }, () => ({
+      category: "delivery" as const,
+      rewardCents: 1600,
+    }));
+    const learned = recommendReward({ category: "delivery", estimatedMinutes: 20, history, now });
+    expect(learned.typicalCents).toBeGreaterThan(base.typicalCents);
+    expect(learned.sampleSize).toBe(5);
+    expect(learned.factors.some((factor) => factor.includes("5 completed"))).toBe(true);
+    expect(learned.typicalCents).toBeLessThanOrEqual(base.typicalCents * 1.2 + 50);
+  });
+
+  it("ignores a thin or unrelated history", () => {
+    const base = recommendReward({ category: "tech", estimatedMinutes: 30, now });
+    const thin = recommendReward({
+      category: "tech",
+      estimatedMinutes: 30,
+      history: [
+        { category: "moving", rewardCents: 5000 },
+        { category: "tech", rewardCents: 5000 },
+      ],
+      now,
+    });
+    expect(thin.typicalCents).toBe(base.typicalCents);
+    expect(thin.sampleSize).toBeUndefined();
+  });
+
   it("classifies a reward against the suggested range", () => {
     const rec = { minCents: 500, maxCents: 900 };
     expect(rewardPosition(400, rec)).toBe("below");

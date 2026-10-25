@@ -11,6 +11,11 @@ import { clamp01 } from "@/lib/format";
 import { distanceBetweenLocations, travelMinutes } from "@/lib/locations";
 import { minutesUntil } from "@/lib/time";
 
+export interface RewardSample {
+  category: TaskCategory;
+  rewardCents: number;
+}
+
 export interface PricingInput {
   category: TaskCategory;
   estimatedMinutes: number;
@@ -19,6 +24,8 @@ export interface PricingInput {
   dropoffLocationId?: string;
   expenseCents?: number;
   now?: Date;
+  /** Completed rewards from this workspace, used to adjust the estimate. */
+  history?: RewardSample[];
 }
 
 export interface RewardRecommendation {
@@ -32,6 +39,7 @@ export interface RewardRecommendation {
   factors: string[];
   explanation: string;
   confidence: "estimated";
+  sampleSize?: number;
 }
 
 export const PRICING_CONFIG: Record<
@@ -123,7 +131,25 @@ export function recommendReward(input: PricingInput): RewardRecommendation {
     factors.push("Receipt expenses are reimbursed separately");
   }
 
-  const base = effortHours * config.hourlyCents * multiplier;
+  let base = effortHours * config.hourlyCents * multiplier;
+  const samples = (input.history ?? [])
+    .filter((sample) => sample.category === input.category && sample.rewardCents >= 100)
+    .map((sample) => sample.rewardCents)
+    .sort((a, b) => a - b);
+  let sampleSize = 0;
+  if (samples.length >= 3) {
+    // Median completed reward, blended 40/60 with the rules estimate so one
+    // unusual job can't dominate. The adjustment is capped at ±20%.
+    const median = samples[Math.floor(samples.length / 2)];
+    const ratio = Math.min(1.2, Math.max(0.8, median / base));
+    base = base * 0.6 + base * ratio * 0.4;
+    sampleSize = samples.length;
+    factors.push(
+      `Adjusted from ${samples.length} completed ${config.label.toLowerCase()} ${
+        samples.length === 1 ? "task" : "tasks"
+      }`,
+    );
+  }
   const typical = Math.max(
     config.minimumCents,
     roundToStep(base, 50),
@@ -140,8 +166,11 @@ export function recommendReward(input: PricingInput): RewardRecommendation {
     totalMinutes,
     hourlyCents: config.hourlyCents,
     factors,
-    explanation: `Estimated from ${config.label.toLowerCase()} effort, travel, and timing.`,
+    explanation: sampleSize
+      ? `Estimated from ${config.label.toLowerCase()} effort, travel, timing, and ${sampleSize} completed tasks.`
+      : `Estimated from ${config.label.toLowerCase()} effort, travel, and timing.`,
     confidence: "estimated",
+    sampleSize: sampleSize || undefined,
   };
 }
 
