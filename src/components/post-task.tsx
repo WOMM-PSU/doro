@@ -65,6 +65,32 @@ const CATEGORY_SKILLS: Record<TaskCategory, string[]> = {
 
 type DeadlinePreset = "asap" | "today" | "tomorrow" | "custom";
 
+/** Validated fields in on-screen order, so a failed publish jumps to the first one. */
+const FIELD_ORDER: { key: string; id: string }[] = [
+  { key: "title", id: "task-title" },
+  { key: "description", id: "task-description" },
+  { key: "duration", id: "task-duration" },
+  { key: "dropoff", id: "task-dropoff" },
+  { key: "deadline", id: "deadline-options" },
+  { key: "reward", id: "task-reward" },
+  { key: "expense", id: "task-expense" },
+];
+
+/** Scrolls a field (or error) into the middle of the dialog and focuses it. */
+function revealField(id: string) {
+  // Wait a frame so freshly rendered errors and expanded sections exist.
+  window.requestAnimationFrame(() => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.scrollIntoView({ block: "center" });
+    const focusTarget =
+      element.matches("input, textarea, select")
+        ? element
+        : element.querySelector<HTMLElement>("[aria-pressed='true'], input, button");
+    focusTarget?.focus({ preventScroll: true });
+  });
+}
+
 export function PostTaskDialog() {
   const { user, store, state } = useDemo();
   const ui = useUi();
@@ -176,7 +202,7 @@ export function PostTaskDialog() {
     ui.closeCompose();
   };
 
-  const validate = (): boolean => {
+  const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
     if (title.trim().length < 4) next.title = "Give the task a short, clear title.";
     if (description.trim().length < 12) next.description = "Add a sentence or two about what you need.";
@@ -196,11 +222,20 @@ export function PostTaskDialog() {
       next.expense = "Keep reimbursable expenses under $200.";
     }
     setErrors(next);
-    return Object.keys(next).length === 0;
+    return next;
   };
 
   const handleSubmit = () => {
-    if (!validate() || !deadline) return;
+    const next = validate();
+    const firstInvalid = FIELD_ORDER.find((field) => next[field.key]);
+    if (firstInvalid) {
+      if (firstInvalid.key === "expense") setMoreOpen(true);
+      revealField(
+        firstInvalid.key === "deadline" && preset === "custom" ? "custom-deadline" : firstInvalid.id,
+      );
+      return;
+    }
+    if (!deadline) return;
     const result = store.createTask({
       title,
       description,
@@ -221,6 +256,7 @@ export function PostTaskDialog() {
     });
     if (!result.ok) {
       setFormError(result.error);
+      revealField("post-task-error");
       return;
     }
     setFormError(null);
@@ -362,7 +398,7 @@ export function PostTaskDialog() {
               className="min-w-0 space-y-6"
             >
               {formError ? (
-                <div className="flex items-start gap-2 rounded-xl border border-[#f1d3ce] bg-danger-soft px-3 py-2.5 text-[12px] leading-relaxed text-danger" role="alert">
+                <div id="post-task-error" className="flex items-start gap-2 rounded-xl border border-[#f1d3ce] bg-danger-soft px-3 py-2.5 text-[12px] leading-relaxed text-danger" role="alert">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {formError}
                 </div>
@@ -543,7 +579,7 @@ export function PostTaskDialog() {
                   <p className="text-[13px] font-semibold text-ink" id="deadline-label">
                     Deadline
                   </p>
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="group" aria-labelledby="deadline-label">
+                  <div id="deadline-options" className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4" role="group" aria-labelledby="deadline-label">
                     {(
                       [
                         { value: "asap", label: "ASAP" },
