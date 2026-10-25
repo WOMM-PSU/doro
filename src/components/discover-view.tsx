@@ -110,28 +110,20 @@ export function DiscoverView() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
-            <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
-            University Park, PA
-            <span className="text-line" aria-hidden>|</span>
-            <span className="normal-case tracking-normal text-muted">Approximate demo campus</span>
-          </div>
-          <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[40px]">
-            {greeting()}, {firstName}.
-          </h1>
-          <p className="mt-2.5 max-w-xl text-[13.5px] leading-relaxed text-muted sm:text-sm">
-            <span className="font-medium text-ink">Get your stuff done.</span> Find a
-            nearby task that fits your time, or post one of your own.
-          </p>
+      <header>
+        <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
+          University Park, PA
+          <span className="text-line" aria-hidden>|</span>
+          <span className="normal-case tracking-normal text-muted">Approximate demo campus</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="lime" size="lg" onClick={ui.openCompose} className="hidden sm:inline-flex">
-            <Plus className="size-4" aria-hidden />
-            Post a task
-          </Button>
-        </div>
+        <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[40px]">
+          {greeting()}, {firstName}.
+        </h1>
+        <p className="mt-2.5 max-w-xl text-[13.5px] leading-relaxed text-muted sm:text-sm">
+          <span className="font-medium text-ink">Get your stuff done.</span> Find a
+          nearby task that fits your time, or post one of your own.
+        </p>
       </header>
 
       <section aria-label="Find tasks" className="space-y-3">
