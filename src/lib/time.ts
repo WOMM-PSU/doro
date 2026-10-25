@@ -71,6 +71,22 @@ export function formatShortDeadline(iso: string, now: Date = new Date()): string
   return formatDeadline(iso, now);
 }
 
+/** Time left before a deadline in the largest sensible unit: "20 min left", "3h 15m left", "2 days left". */
+export function formatTimeLeft(iso: string, now: Date = new Date()): string {
+  const minutes = minutesUntil(iso, now);
+  if (minutes <= 0) return "Deadline passed";
+  if (minutes < 60) return `${minutes} min left`;
+  if (minutes < 24 * 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest < 15 ? `${hours}h left` : `${hours}h ${rest}m left`;
+  }
+  const days = Math.floor(minutes / (24 * 60));
+  const hours = Math.floor((minutes % (24 * 60)) / 60);
+  if (days < 3 && hours > 0) return `${days} ${days === 1 ? "day" : "days"} ${hours}h left`;
+  return `${days} ${days === 1 ? "day" : "days"} left`;
+}
+
 export function formatRelative(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";

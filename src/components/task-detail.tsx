@@ -77,7 +77,7 @@ import {
   refundStripeEscrowHold,
 } from "@/lib/stripe-client";
 import { formatMoney } from "@/lib/format";
-import { formatDeadline, formatRelative, formatTimeOnly, minutesUntil } from "@/lib/time";
+import { formatDeadline, formatRelative, formatTimeLeft, formatTimeOnly, minutesUntil } from "@/lib/time";
 import {
   Avatar,
   Button,
@@ -427,9 +427,7 @@ export function TaskDetailSheet() {
               hint={
                 status === "COMPLETED"
                   ? "Completed"
-                  : minutes <= 0
-                    ? "Deadline passed"
-                    : `${Math.max(1, Math.round(minutes / 60))}h remaining`
+                  : formatTimeLeft(task.deadline)
               }
               tone={urgent ? "warning" : "default"}
             />
