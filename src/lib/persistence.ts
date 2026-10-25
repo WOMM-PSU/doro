@@ -75,6 +75,12 @@ function sanitize(raw: unknown): DemoState | null {
     activeUserId,
     version: CURRENT_STATE_VERSION,
     seededAt: typeof raw.seededAt === "string" ? raw.seededAt : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === "string"
+        ? raw.updatedAt
+        : typeof raw.seededAt === "string"
+          ? raw.seededAt
+          : new Date().toISOString(),
     onboardingDismissed: raw.onboardingDismissed === true,
   };
 }

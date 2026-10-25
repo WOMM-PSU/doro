@@ -25,7 +25,8 @@ import type {
   UserPreferences,
 } from "@/types";
 import { createSeedState } from "@/features/seed";
-import { saveState } from "@/lib/persistence";
+import type { StateRepository, SyncInfo } from "@/lib/repository";
+import { LocalRepository } from "@/lib/repository";
 import { calculateMatch, CATEGORY_LABELS, MATCH_CONFIG } from "@/features/matching";
 import { formatMiles, formatMoney } from "@/lib/format";
 import { getLocation } from "@/lib/locations";
@@ -264,11 +265,62 @@ export class DemoStore {
   private state: DemoState;
   private listeners = new Set<() => void>();
   private persist: boolean;
+  private repository: StateRepository;
+  private dirty = false;
+  private unsubscribeRemote: () => void;
   storageAvailable = true;
 
-  constructor(initial: DemoState, options: { persist?: boolean } = {}) {
+  constructor(
+    initial: DemoState,
+    options: { persist?: boolean; repository?: StateRepository } = {},
+  ) {
     this.state = initial;
     this.persist = options.persist ?? true;
+    this.repository = options.repository ?? new LocalRepository();
+    this.unsubscribeRemote = this.repository.subscribe((remote) => {
+      if (remote) {
+        this.applyRemote(remote);
+      } else if (this.persist) {
+        // A reachable but empty cloud workspace starts from this state.
+        this.repository.push(this.state);
+      }
+    });
+  }
+
+  dispose(): void {
+    this.unsubscribeRemote?.();
+  }
+
+  getRepository(): StateRepository {
+    return this.repository;
+  }
+
+  getSyncInfo(): SyncInfo {
+    return this.repository.getSyncInfo();
+  }
+
+  onSyncInfo(listener: (info: SyncInfo) => void): () => void {
+    return this.repository.onSyncInfo(listener);
+  }
+
+  /** Applies a newer workspace snapshot without changing this device's persona. */
+  applyRemote(remote: DemoState): boolean {
+    const incoming = new Date(remote.updatedAt).getTime();
+    const current = new Date(this.state.updatedAt).getTime();
+    if (this.dirty && Number.isFinite(incoming) && incoming <= current) return false;
+    const activeUserId = remote.users.some((u) => u.id === this.state.activeUserId)
+      ? this.state.activeUserId
+      : remote.activeUserId;
+    this.state = {
+      ...remote,
+      activeUserId,
+      onboardingDismissed:
+        this.state.onboardingDismissed || remote.onboardingDismissed,
+    };
+    this.dirty = false;
+    if (this.persist) this.storageAvailable = this.repository.save(this.state);
+    this.emit();
+    return true;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -287,9 +339,12 @@ export class DemoStore {
     const now = new Date().toISOString();
     const result = updater(draft, now);
     if (!result.ok) return result;
+    draft.updatedAt = now;
     this.state = draft;
+    this.dirty = true;
     if (this.persist) {
-      this.storageAvailable = saveState(draft);
+      this.storageAvailable = this.repository.save(draft);
+      this.repository.push(draft);
     }
     this.emit();
     return result;
@@ -317,8 +372,13 @@ export class DemoStore {
 
   resetDemo(): ActionResult<DemoState> {
     const fresh = createSeedState(new Date());
+    fresh.updatedAt = new Date().toISOString();
     this.state = fresh;
-    if (this.persist) this.storageAvailable = saveState(fresh);
+    this.dirty = true;
+    if (this.persist) {
+      this.storageAvailable = this.repository.save(fresh);
+      this.repository.push(fresh);
+    }
     this.emit();
     return { ok: true, data: fresh };
   }

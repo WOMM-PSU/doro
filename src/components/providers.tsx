@@ -13,6 +13,7 @@ import {
 import type { DemoState, User } from "@/types";
 import { DemoStore } from "@/features/store";
 import { loadState } from "@/lib/persistence";
+import { createStateRepository } from "@/lib/repository";
 import { activeUser } from "@/features/selectors";
 import { DoroLogo } from "@/components/brand";
 import {
@@ -74,7 +75,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loaded = loadState();
-    setStore(new DemoStore(loaded.state));
+    setStore(new DemoStore(loaded.state, { repository: createStateRepository() }));
     if (loaded.notice) setNotice(loaded.notice);
   }, []);
 

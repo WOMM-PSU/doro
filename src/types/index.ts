@@ -226,6 +226,8 @@ export interface TaskEvent {
 export interface DemoState {
   version: number;
   seededAt: string;
+  /** Last local mutation, used to reconcile devices. */
+  updatedAt: string;
   activeUserId: string;
   onboardingDismissed: boolean;
   users: User[];

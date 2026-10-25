@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { atLocalTime, hoursFromNow } from "@/lib/time";
 
-export const CURRENT_STATE_VERSION = 3;
+export const CURRENT_STATE_VERSION = 4;
 
 const iso = (date: Date) => date.toISOString();
 
@@ -1158,6 +1158,7 @@ export function createSeedState(now: Date = new Date()): DemoState {
   return {
     version: CURRENT_STATE_VERSION,
     seededAt: now.toISOString(),
+    updatedAt: now.toISOString(),
     activeUserId: "u-maya",
     onboardingDismissed: false,
     users: buildUsers(now),

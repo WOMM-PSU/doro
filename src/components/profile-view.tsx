@@ -11,6 +11,7 @@ import {
   Car,
   Check,
   CheckCircle2,
+  Cloud,
   Clock3,
   Flag,
   Footprints,
@@ -59,6 +60,7 @@ export function ProfileView() {
   const { toast } = useToast();
   const [draft, setDraft] = useState<UserPreferences>(user.preferences);
   const [resetOpen, setResetOpen] = useState(false);
+  const [syncInfo, setSyncInfo] = useState(() => store.getSyncInfo());
   const stats = getUserStats(state, user);
   const payments = getPaymentHistory(state, user.id).slice(0, 5);
   const reports = useMemo(
@@ -74,6 +76,11 @@ export function ProfileView() {
   useEffect(() => {
     setDraft(user.preferences);
   }, [user.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setSyncInfo(store.getSyncInfo());
+    return store.onSyncInfo(setSyncInfo);
+  }, [store]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(user.preferences);
 
@@ -539,6 +546,37 @@ export function ProfileView() {
             )}
             <p className="mt-2 text-[9.5px] leading-relaxed text-muted">
               No real charge, transfer or bank account is involved. The ledger lives in this browser.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-surface p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                <Cloud className="size-3.5" aria-hidden />
+                Workspace sync
+              </h2>
+              <Pill
+                tone={
+                  syncInfo.status === "synced"
+                    ? "success"
+                    : syncInfo.status === "offline"
+                      ? "danger"
+                      : "neutral"
+                }
+              >
+                {syncInfo.status === "synced"
+                  ? "Supabase"
+                  : syncInfo.status === "connecting"
+                    ? "Checking"
+                    : syncInfo.status === "offline"
+                      ? "Offline"
+                      : "This browser"}
+              </Pill>
+            </div>
+            <p className="mt-1 text-[10.5px] leading-relaxed text-muted">{syncInfo.detail}</p>
+            <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted">
+              Local mode is the default and needs no keys. Supabase is optional: set the server
+              keys and run <span className="font-mono">supabase/schema.sql</span>.
             </p>
           </section>
 
