@@ -45,6 +45,7 @@ import {
   taskPickup,
 } from "@/lib/places";
 import { AddressField } from "@/components/address-field";
+import { resolvePlaceText } from "@/lib/place-lookup";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
 import {
@@ -402,26 +403,55 @@ export function PostTaskDialog() {
         setRewardInput((parsed.rewardCents / 100).toFixed(2));
         setRewardTouched(true);
       }
-      if (parsed.dropoffLocationId) {
-        setPickup(placeFromLocationId(parsed.locationId));
-        setDropoff(placeFromLocationId(parsed.dropoffLocationId));
-      } else if (parsed.locationId) {
-        setSpot(placeFromLocationId(parsed.locationId));
-        setPickup(placeFromLocationId(parsed.locationId));
+      // Places outside the twelve-spot catalogue arrive as text ("cooper
+      // hall"); resolve them the same way the address field does.
+      const missing: string[] = [];
+      const resolve = async (id: string | undefined, text: string | undefined) => {
+        if (id) return placeFromLocationId(id);
+        if (!text) return undefined;
+        const place = await resolvePlaceText(text);
+        if (!place) missing.push(text);
+        return place;
+      };
+
+      if (parsed.dropoffLocationId || parsed.dropoffText) {
+        const [nextPickup, nextDropoff] = await Promise.all([
+          resolve(parsed.locationId, parsed.pickupText),
+          resolve(parsed.dropoffLocationId, parsed.dropoffText),
+        ]);
+        if (nextPickup) setPickup(nextPickup);
+        if (nextDropoff) setDropoff(nextDropoff);
+      } else if (parsed.locationId || parsed.pickupText) {
+        const nextSpot = await resolve(parsed.locationId, parsed.pickupText);
+        if (nextSpot) {
+          setSpot(nextSpot);
+          setPickup(nextSpot);
+        }
       }
       if (parsed.deadline) {
         setPreset("custom");
         setCustomDeadline(toDateTimeLocalValue(new Date(parsed.deadline)));
       }
       setErrors({});
-      toast(
-        local
-          ? "Read by Groq. Review anything it guessed."
-          : parsed.source === "rules"
-            ? "Filled with the local rule parser. Review before posting."
-            : "Filled the form. Review before posting.",
-        "default",
-      );
+      // The unresolved-place warning replaces the generic success toast, not
+      // the other way round, so it is the message left on screen.
+      if (missing.length > 0) {
+        toast(
+          `Filled the form, but couldn't find ${missing
+            .map((place) => `“${place}”`)
+            .join(", ")}. Pick it from the address list.`,
+          "error",
+        );
+      } else {
+        toast(
+          local
+            ? "Read by Groq. Review anything it guessed."
+            : parsed.source === "rules"
+              ? "Filled with the local rule parser. Review before posting."
+              : "Filled the form. Review before posting.",
+          "default",
+        );
+      }
     } finally {
       setSentenceBusy(false);
     }

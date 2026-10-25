@@ -87,6 +87,46 @@ describe("sanitizeModelJson", () => {
     expect(parsed?.estimatedMinutes).toBe(12);
   });
 
+  it("keeps a place name the catalogue doesn't know", () => {
+    const parsed = sanitizeModelJson(
+      JSON.stringify({
+        title: "Get a choolah bowl from Redifer to Cooper Hall",
+        category: "delivery",
+        locationId: "redifer",
+        dropoffLocationId: null,
+        pickupText: null,
+        dropoffText: "cooper hall",
+        deadlineISO: null,
+        estimatedMinutes: 15,
+        rewardCents: null,
+      }),
+      "get a choolah bowl from redifer to cooper hall",
+      now,
+    );
+    expect(parsed?.locationId).toBe("redifer");
+    expect(parsed?.dropoffText).toBe("cooper hall");
+  });
+
+  it("rejects a place span that is really a time clause", () => {
+    const parsed = sanitizeModelJson(
+      JSON.stringify({
+        title: "Bring it over",
+        category: "delivery",
+        locationId: null,
+        dropoffLocationId: null,
+        pickupText: "pattee",
+        dropoffText: "east halls by 5pm",
+        deadlineISO: null,
+        estimatedMinutes: 15,
+        rewardCents: null,
+      }),
+      text,
+      now,
+    );
+    expect(parsed?.pickupText).toBe("pattee");
+    expect(parsed?.dropoffText).toBeUndefined();
+  });
+
   it("returns null when there is no JSON to read", () => {
     expect(sanitizeModelJson("I could not do that.", text, now)).toBeNull();
   });
@@ -136,6 +176,21 @@ describe("mergeSentenceParses", () => {
     expect(merged?.category).toBe("delivery");
     // A zero estimate from the model never reaches the form.
     expect(merged?.estimatedMinutes).toBe(rules?.estimatedMinutes);
+  });
+
+  it("treats a named drop-off outside the catalogue as a delivery", () => {
+    const text = "get my bowl from redifer to cooper hall";
+    const rules = parseTaskSentence(text, { now });
+    const model = sanitizeModelJson(
+      '{"title":"Get my bowl to Cooper Hall","category":"errands","locationId":"redifer","dropoffLocationId":null,"pickupText":null,"dropoffText":"cooper hall","deadlineISO":null,"estimatedMinutes":10,"rewardCents":null}',
+      text,
+      now,
+    );
+    expect(model?.category).toBe("errands");
+    const merged = mergeSentenceParses(model, rules);
+    expect(merged?.category).toBe("delivery");
+    expect(merged?.locationId).toBe("redifer");
+    expect(merged?.dropoffText).toBe("cooper hall");
   });
 
   it("falls back to whichever parse exists", () => {

@@ -40,6 +40,26 @@ describe("parseTaskSentence", () => {
     expect(parsed?.dropoffLocationId).toBeUndefined();
   });
 
+  it("keeps a place the catalogue doesn't know as text", () => {
+    const parsed = parseTaskSentence(
+      "help me get my choolah bowl w name of jatin srivastava from redifer to cooper hall",
+      { now },
+    );
+    expect(parsed?.category).toBe("delivery");
+    expect(parsed?.locationId).toBe("redifer");
+    expect(parsed?.dropoffLocationId).toBeUndefined();
+    expect(parsed?.pickupText).toBeUndefined();
+    expect(parsed?.dropoffText).toBe("cooper hall");
+  });
+
+  it("does not carry text for places the catalogue already knows", () => {
+    const parsed = parseTaskSentence("Bring my charger from Pattee to East Halls", { now });
+    expect(parsed?.locationId).toBe("pattee");
+    expect(parsed?.dropoffLocationId).toBe("east-halls");
+    expect(parsed?.pickupText).toBeUndefined();
+    expect(parsed?.dropoffText).toBeUndefined();
+  });
+
   it("ignores implausible rewards and rejects tiny fragments", () => {
     const parsed = parseTaskSentence("Deliver a notebook to Pattee for $5000", { now });
     expect(parsed?.rewardCents).toBeUndefined();

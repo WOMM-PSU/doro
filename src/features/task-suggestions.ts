@@ -22,6 +22,12 @@ export interface ParsedTaskSentence {
   category: TaskCategory;
   locationId?: string;
   dropoffLocationId?: string;
+  /**
+   * The place as written when it isn't one of the catalogue ids. The composer
+   * geocodes these, so a sentence can name any address, not just twelve.
+   */
+  pickupText?: string;
+  dropoffText?: string;
   deadline?: string;
   estimatedMinutes: number;
   rewardCents?: number;
@@ -52,6 +58,16 @@ const LOCATION_ALIASES: { id: string; aliases: string[] }[] = [
   { id: "downtown", aliases: ["downtown state college", "downtown", "college ave", "state college"] },
   { id: "redifer", aliases: ["redifer commons", "redifer"] },
 ];
+
+/** Trims quotes, filler and trailing punctuation from a place phrase. */
+function cleanPlaceText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .replace(/^[\s"'“”]+|[\s"'“”.!,]+$/g, "")
+    .replace(/^(?:the|my|our)\s+/i, "")
+    .trim();
+  return cleaned.length >= 2 && cleaned.length <= 80 ? cleaned : undefined;
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -210,11 +226,19 @@ export function parseTaskSentence(
   const fromTo = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+(?:by|before|at|around|for|with|and)\b|[,.]|$)/i.exec(text);
   let locationId: string | undefined;
   let dropoffLocationId: string | undefined;
+  let pickupText: string | undefined;
+  let dropoffText: string | undefined;
 
   if (fromTo) {
     locationId = findLocationInText(fromTo[1])?.id;
     dropoffLocationId = findLocationInText(fromTo[2])?.id;
-    if (locationId) notes.push("Read the pickup and drop-off from “from … to …”.");
+    // Keep the phrase even when the catalogue knows it; the composer only needs
+    // the text for places it can't name.
+    pickupText = cleanPlaceText(fromTo[1]);
+    dropoffText = cleanPlaceText(fromTo[2]);
+    if (locationId || pickupText) {
+      notes.push("Read the pickup and drop-off from “from … to …”.");
+    }
   }
   if (!locationId || !dropoffLocationId) {
     const mentions = findAllLocationMentions(text);
@@ -244,12 +268,16 @@ export function parseTaskSentence(
   const estimatedMinutes = inferMinutes(text, category);
   const location = LOCATIONS.find((item) => item.id === (locationId ?? dropoffLocationId));
 
+  const twoStops = Boolean(dropoffLocationId || dropoffText);
+
   return {
     title: inferTitle(text),
     description: text,
-    category: dropoffLocationId ? (category === "other" ? "delivery" : category) : category,
+    category: twoStops ? (category === "other" ? "delivery" : category) : category,
     locationId: locationId ?? location?.id,
     dropoffLocationId,
+    pickupText: locationId ? undefined : pickupText,
+    dropoffText: dropoffLocationId ? undefined : dropoffText,
     deadline,
     estimatedMinutes,
     rewardCents,

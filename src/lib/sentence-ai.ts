@@ -91,6 +91,15 @@ export function sanitizeModelJson(
   const dropoffLocationId = LOCATIONS.some((location) => location.id === data.dropoffLocationId)
     ? (data.dropoffLocationId as string)
     : undefined;
+  // A place the catalogue doesn't know survives as text; the composer geocodes
+  // it. Long spans are usually a clause the model misread, not a place name.
+  const place = (value: unknown): string | undefined => {
+    const text = str(value);
+    if (!text || text.length > 80 || /\b(?:by|before|for|at)\s+\d/i.test(text)) return undefined;
+    return text;
+  };
+  const pickupText = locationId ? undefined : place(data.pickupText);
+  const dropoffText = dropoffLocationId ? undefined : place(data.dropoffText);
 
   let deadline: string | undefined;
   if (typeof data.deadlineISO === "string") {
@@ -118,6 +127,8 @@ export function sanitizeModelJson(
     locationId,
     dropoffLocationId:
       dropoffLocationId && dropoffLocationId !== locationId ? dropoffLocationId : undefined,
+    pickupText,
+    dropoffText: dropoffText && dropoffText !== pickupText ? dropoffText : undefined,
     deadline,
     estimatedMinutes,
     rewardCents,
@@ -143,7 +154,9 @@ export function mergeSentenceParses(
   // A cheap model reads "bring X from A to B" as an errand often enough that a
   // sanity rule is worth it: two distinct places means a delivery, whatever the
   // model called it. Moving is the one two-place category that is not a drop.
-  const twoPlaces = Boolean(model.dropoffLocationId || rules.dropoffLocationId);
+  const twoPlaces = Boolean(
+    model.dropoffLocationId || rules.dropoffLocationId || model.dropoffText || rules.dropoffText,
+  );
   const category =
     model.category === "other"
       ? rules.category
@@ -157,6 +170,8 @@ export function mergeSentenceParses(
     category,
     locationId: model.locationId ?? rules.locationId,
     dropoffLocationId: model.dropoffLocationId ?? rules.dropoffLocationId,
+    pickupText: model.locationId ? undefined : model.pickupText ?? rules.pickupText,
+    dropoffText: model.dropoffLocationId ? undefined : model.dropoffText ?? rules.dropoffText,
     deadline: model.deadline ?? rules.deadline,
     // Duration is category work, not language: the parser reads explicit
     // "20 minutes" and knows a move takes longer than a coffee run. Every model

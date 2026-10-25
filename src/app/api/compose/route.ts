@@ -62,6 +62,8 @@ const SCHEMA = {
     category: { type: "string", enum: CATEGORIES },
     locationId: nullableString,
     dropoffLocationId: nullableString,
+    pickupText: nullableString,
+    dropoffText: nullableString,
     deadlineISO: nullableString,
     estimatedMinutes: { type: "integer" },
     rewardCents: { anyOf: [{ type: "integer" }, { type: "null" }] },
@@ -71,6 +73,8 @@ const SCHEMA = {
     "category",
     "locationId",
     "dropoffLocationId",
+    "pickupText",
+    "dropoffText",
     "deadlineISO",
     "estimatedMinutes",
     "rewardCents",
@@ -79,13 +83,14 @@ const SCHEMA = {
 };
 
 const SYSTEM_PROMPT =
-  "You extract one campus task request into JSON for a task app. Copy only what the request says. rewardCents is integer cents, so $8 is 800. Use null for anything the request does not state.";
+  "You extract one campus task request into JSON for a task app. Copy only what the request says. rewardCents is integer cents, so $8 is 800. Use null for anything the request does not state. For a pickup or drop-off that is not in the allowed id list, put the place name exactly as the request writes it in pickupText or dropoffText (for example \"cooper hall\") and leave that id null. Never drop a place because its id is unknown.";
 
 function userPrompt(text: string, localTime: string): string {
   const places = LOCATIONS.map((location) => `${location.id} (${location.name})`).join(", ");
   return [
     `Allowed categories: ${CATEGORIES.join(", ")}.`,
     `Allowed location ids: ${places}.`,
+    "If a place in the request is not one of those ids, keep its name in pickupText or dropoffText instead of choosing a nearby id.",
     `Current local time: ${localTime}.`,
     "",
     `Request: ${JSON.stringify(text)}`,
