@@ -6,9 +6,11 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
@@ -300,6 +302,32 @@ export function Field({
   );
 }
 
+/**
+ * Fades the right edge of a horizontal scroller while more content is hidden
+ * there, so cut-off options read as "scroll for more".
+ */
+export function useScrollFade<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [fade, setFade] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const update = () => setFade(element.scrollWidth - element.clientWidth - element.scrollLeft > 4);
+    update();
+    element.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => {
+      element.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, []);
+  return {
+    ref,
+    fadeClass: fade ? "[mask-image:linear-gradient(to_right,black_calc(100%-36px),transparent)]" : "",
+  };
+}
+
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -307,6 +335,7 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   className,
   size = "md",
+  containerRef,
 }: {
   options: { value: T; label: string; icon?: ReactNode; count?: number }[];
   value: T;
@@ -314,9 +343,11 @@ export function SegmentedControl<T extends string>({
   ariaLabel: string;
   className?: string;
   size?: "sm" | "md";
+  containerRef?: Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={containerRef}
       role="tablist"
       aria-label={ariaLabel}
       className={cn(

@@ -40,6 +40,7 @@ import {
   Pill,
   StatusBadge,
   cn,
+  useScrollFade,
 } from "@/components/ui";
 import { CATEGORY_ICONS } from "@/components/icons";
 
@@ -62,6 +63,7 @@ export function ActivityView() {
   const { state, user } = useDemo();
   const ui = useUi();
   const [tab, setTab] = useState<TabValue>("needs");
+  const tabsFade = useScrollFade<HTMLDivElement>();
   const previousUser = useRef(user.id);
 
   // Remember the tab for this browser tab so coming back to Activity doesn't
@@ -163,7 +165,10 @@ export function ActivityView() {
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+        <div
+          ref={tabsFade.ref}
+          className={cn("no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5", tabsFade.fadeClass)}
+        >
           {TABS.map((item) => (
             <button
               key={item.value}

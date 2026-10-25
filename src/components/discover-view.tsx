@@ -34,6 +34,7 @@ import {
   Modal,
   SegmentedControl,
   cn,
+  useScrollFade,
   useToast,
 } from "@/components/ui";
 
@@ -63,6 +64,8 @@ export function DiscoverView() {
     maxDistanceMiles: user.preferences.maxDistanceMiles,
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const modeFade = useScrollFade<HTMLDivElement>();
+  const categoryFade = useScrollFade<HTMLDivElement>();
   const [view, setView] = useState<"list" | "map">("list");
   const [selectedPin, setSelectedPin] = useState<string | null>(null);
 
@@ -165,7 +168,8 @@ export function DiscoverView() {
                 setSelectedPin(null);
               }}
               options={MODES.map((m) => ({ value: m.value, label: m.label }))}
-              className="no-scrollbar max-w-full overflow-x-auto"
+              className={cn("no-scrollbar max-w-full overflow-x-auto", modeFade.fadeClass)}
+              containerRef={modeFade.ref}
             />
             <Button
               variant="outline"
@@ -184,7 +188,10 @@ export function DiscoverView() {
           </div>
         </div>
 
-        <div className="no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+        <div
+          ref={categoryFade.ref}
+          className={cn("no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5", categoryFade.fadeClass)}
+        >
           {CATEGORIES.map((cat) => {
             const active = filters.category === cat.value;
             return (
