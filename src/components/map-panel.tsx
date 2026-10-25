@@ -339,7 +339,7 @@ export function MapPanel({
 
         const pinIcon = L.divIcon({
           className: "doro-task-pin",
-          html: `<button type="button" aria-label="Open ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}" style="transform:translate(-50%,-50%) ${scale};display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${border};border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;transition:transform 140ms ease;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:${dotColor};display:inline-block;"></span>${priceText}</button>`,
+          html: `<button type="button" aria-label="${selectedId === ranked.task.id ? "Open" : "Select"} ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}" style="transform:translate(-50%,-50%) ${scale};display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${border};border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;transition:transform 140ms ease;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:${dotColor};display:inline-block;"></span>${priceText}</button>`,
           iconSize: [0, 0],
         });
 
@@ -348,9 +348,10 @@ export function MapPanel({
           zIndexOffset: isSelected ? 1000 : idx * 10,
         });
 
+        // First tap selects (route + strip below the map); tapping the selected pin opens it.
         marker.on("click", () => {
-          onSelect(ranked.task.id);
-          onOpen(ranked.task.id);
+          if (selectedId === ranked.task.id) onOpen(ranked.task.id);
+          else onSelect(ranked.task.id);
         });
 
         marker.addTo(markersLayer);
@@ -460,6 +461,7 @@ export function MapPanel({
             tasks={tasks}
             byLocation={byLocation}
             selectedId={selectedId ?? selectedRanked?.task.id ?? null}
+            chosenId={selectedId}
             onSelect={onSelect}
             onOpen={onOpen}
             interactivePins={!mapReady || styleMode === "blueprint"}
@@ -595,6 +597,7 @@ export function MapPanel({
             <button
               type="button"
               onClick={() => onOpen(selectedRanked.task.id)}
+              aria-label={`Open ${selectedRanked.task.title}`}
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[11px] font-semibold text-lime transition-transform hover:scale-[1.02]"
             >
               <span>
@@ -636,6 +639,7 @@ function CampusBlueprintUnderlay({
   tasks,
   byLocation,
   selectedId,
+  chosenId,
   onSelect,
   onOpen,
   interactivePins,
@@ -643,6 +647,8 @@ function CampusBlueprintUnderlay({
   tasks: RankedTask[];
   byLocation: Map<string, RankedTask[]>;
   selectedId: string | null;
+  /** The pin the viewer explicitly picked; tapping it again opens the task. */
+  chosenId: string | null;
   onSelect: (taskId: string) => void;
   onOpen: (taskId: string) => void;
   interactivePins: boolean;
@@ -825,10 +831,10 @@ function CampusBlueprintUnderlay({
                   key={ranked.task.id}
                   type="button"
                   onClick={() => {
-                    onSelect(ranked.task.id);
-                    onOpen(ranked.task.id);
+                    if (chosenId === ranked.task.id) onOpen(ranked.task.id);
+                    else onSelect(ranked.task.id);
                   }}
-                  aria-label={`Open ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}`}
+                  aria-label={`${chosenId === ranked.task.id ? "Open" : "Select"} ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}`}
                   className={cn(
                     "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold shadow-soft transition-all",
                     selected
