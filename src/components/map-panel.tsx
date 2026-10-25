@@ -562,7 +562,9 @@ export function MapPanel({
           <span className="text-[10px] text-muted">
             {styleMode === "blueprint"
               ? "Campus Architectural Grid · University Park"
-              : "© OpenStreetMap · Public campus landmarks"}
+              : styleMode === "voyager"
+                ? "© OpenStreetMap contributors © CARTO"
+                : "© OpenStreetMap contributors"}
           </span>
         </div>
       </div>
