@@ -444,7 +444,13 @@ export function MapPanel({
         map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate });
         return;
       }
-      map.fitBounds(L.latLngBounds(points), { padding: [44, 44], maxZoom: 16, animate });
+      // Extra room at the top for the place badge and on the right for the controls.
+      map.fitBounds(L.latLngBounds(points), {
+        paddingTopLeft: [40, 56],
+        paddingBottomRight: [60, 32],
+        maxZoom: 16,
+        animate,
+      });
     },
     [tasks, compact],
   );
@@ -561,8 +567,13 @@ export function MapPanel({
             <div ref={mapContainerRef} className="size-full" />
           </div>
 
-          {/* Top-Left Live Location Badge */}
-          <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-line/90 bg-surface/95 px-2.5 py-1 text-[10.5px] font-semibold text-ink shadow-soft backdrop-blur-sm">
+          {/* Top-Left Live Location Badge (hidden when zoomed in, where it would cover spread-out pins) */}
+          <div
+            className={cn(
+              "pointer-events-none absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-line/90 bg-surface/95 px-2.5 py-1 text-[10.5px] font-semibold text-ink shadow-soft backdrop-blur-sm transition-opacity",
+              zoomedIn && styleMode !== "blueprint" && "opacity-0",
+            )}
+          >
             <span className="size-2 rounded-full bg-[#8fb329]" aria-hidden />
             <span>University Park, PA</span>
           </div>
