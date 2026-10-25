@@ -114,6 +114,13 @@ function HydratedDemoProvider({
     }, 4600);
   }, []);
 
+  // Deadlines pass while the app is open, so check for newly overdue tasks.
+  useEffect(() => {
+    store.syncOverdueTasks();
+    const timer = window.setInterval(() => store.syncOverdueTasks(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [store]);
+
   useEffect(() => {
     if (notice) {
       toast(notice, "default");

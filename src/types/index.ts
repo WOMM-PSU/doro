@@ -124,6 +124,8 @@ export interface Task {
   agreedRewardCents?: number;
   handoffCode?: string;
   handoffVerified?: boolean;
+  /** The helper may still start after the deadline (set when posting or later by the requester). */
+  allowLateFinish?: boolean;
   requirements?: string[];
   requiredSkills?: string[];
   expenseCents?: number;
@@ -226,7 +228,8 @@ export type TaskEventType =
   | "CANCELLED"
   | "DISPUTED"
   | "OFFERED"
-  | "REVIEWED";
+  | "REVIEWED"
+  | "LATE_ALLOWED";
 
 export interface TaskEvent {
   id: string;
@@ -273,6 +276,7 @@ export interface TaskDraft {
   expenseNote?: string;
   itemDescription?: string;
   instructions?: string;
+  allowLateFinish?: boolean;
 }
 
 export type ActionResult<T = undefined> =

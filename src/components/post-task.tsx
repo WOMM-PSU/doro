@@ -37,6 +37,7 @@ import { formatMoney } from "@/lib/format";
 import {
   Avatar,
   Button,
+  Checkbox,
   Field,
   Input,
   Modal,
@@ -113,6 +114,7 @@ export function PostTaskDialog() {
   const [locationId, setLocationId] = useState(user.homeLocationId);
   const [preset, setPreset] = useState<DeadlinePreset>("asap");
   const [customDeadline, setCustomDeadline] = useState("");
+  const [allowLateFinish, setAllowLateFinish] = useState(false);
   const [estimatedMinutes, setEstimatedMinutes] = useState(15);
   const [durationTouched, setDurationTouched] = useState(false);
   const [rewardInput, setRewardInput] = useState("");
@@ -202,6 +204,7 @@ export function PostTaskDialog() {
     setLocationId(user.homeLocationId);
     setPreset("asap");
     setCustomDeadline("");
+    setAllowLateFinish(false);
     setEstimatedMinutes(15);
     setDurationTouched(false);
     setRewardInput("");
@@ -288,6 +291,7 @@ export function PostTaskDialog() {
       acceptanceMode,
       paymentMethod,
       deadline,
+      allowLateFinish,
       estimatedMinutes: Number(estimatedMinutes),
       requirements: requirements || undefined,
       requiredSkills: CATEGORY_SKILLS[category],
@@ -435,6 +439,12 @@ export function PostTaskDialog() {
                 <span className="text-[11px] font-medium text-muted">Acceptance</span>
                 <span className="text-[11.5px] font-medium text-ink">
                   {publishedTask.acceptanceMode === "fixed" ? "Fixed reward" : "Open to offers"}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-medium text-muted">If it runs late</span>
+                <span className="text-[11.5px] font-medium text-ink">
+                  {publishedTask.allowLateFinish ? "Helper can still finish" : "You'll be asked"}
                 </span>
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -797,6 +807,14 @@ export function PostTaskDialog() {
                       {errors.deadline}
                     </p>
                   ) : null}
+                  <div className="mt-3">
+                    <Checkbox
+                      checked={allowLateFinish}
+                      onChange={setAllowLateFinish}
+                      label="Helpers can finish late"
+                      description="If the deadline passes before your helper starts, they can still do it. Otherwise we'll ask you first."
+                    />
+                  </div>
                 </div>
 
                 <div>

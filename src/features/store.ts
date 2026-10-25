@@ -33,7 +33,7 @@ import { formatMiles, formatMoney } from "@/lib/format";
 import { getLocation } from "@/lib/locations";
 import { inQuietHours, minutesUntil } from "@/lib/time";
 import { analyzeMessage, detectProhibitedRequest, REPORT_REASONS } from "@/features/moderation";
-import { getTask } from "@/features/selectors";
+import { awaitingLateDecision, getTask } from "@/features/selectors";
 
 /** The only legal task transitions. Components cannot bypass this table. */
 export const ALLOWED_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
@@ -444,6 +444,7 @@ export class DemoStore {
         expenseNote: input.expenseNote?.trim() || undefined,
         itemDescription: input.itemDescription?.trim() || undefined,
         instructions: input.instructions?.trim() || undefined,
+        allowLateFinish: input.allowLateFinish || undefined,
         createdAt: nowIso,
         updatedAt: nowIso,
       };
@@ -752,8 +753,8 @@ export class DemoStore {
       const user = this.currentUser(draft);
       if (task.helperId !== user.id) return { ok: false, error: "Only the assigned helper can start this task." };
       if (task.status !== "ASSIGNED") return { ok: false, error: "This task isn't ready to start." };
-      if (minutesUntil(task.deadline) <= 0) {
-        return { ok: false, error: "The deadline has passed; contact the requester before continuing." };
+      if (awaitingLateDecision(task)) {
+        return { ok: false, error: "The deadline has passed. Wait for the requester to allow a late finish." };
       }
       const moved = transition(draft, task, "IN_PROGRESS", user.id, "Work started", now);
       if (!moved.ok) return moved;
@@ -770,6 +771,84 @@ export class DemoStore {
         now,
       );
       return { ok: true, data: task };
+    });
+  }
+
+  /** Requester lets the helper start an accepted task after its deadline. */
+  allowLateFinish(taskId: string): ActionResult<Task> {
+    return this.apply((draft, now) => {
+      const task = getTask(draft, taskId);
+      if (!task) return { ok: false, error: "Task not found." };
+      const user = this.currentUser(draft);
+      if (task.requesterId !== user.id) {
+        return { ok: false, error: "Only the requester can allow a late finish." };
+      }
+      if (!awaitingLateDecision(task)) {
+        return { ok: false, error: "This task isn't waiting on a late-finish decision." };
+      }
+      task.allowLateFinish = true;
+      task.updatedAt = now;
+      addEvent(draft, task.id, "LATE_ALLOWED", user.id, "Late finish allowed", now);
+      notifyCounterpart(
+        draft,
+        task,
+        user.id,
+        {
+          kind: "SYSTEM",
+          title: `${user.name} allowed a late finish`,
+          body: `You can still start ${task.title}.`,
+          dedupeKey: `late-allowed:${task.id}`,
+        },
+        now,
+      );
+      return { ok: true, data: task };
+    });
+  }
+
+  /**
+   * Tells both people once when an accepted task passes its deadline without a
+   * late-finish allowance. Called on load and on an interval; does nothing (and
+   * doesn't persist) when there is nothing new to say.
+   */
+  syncOverdueTasks(): void {
+    const pending = this.state.tasks.filter(
+      (task) =>
+        awaitingLateDecision(task) &&
+        !this.state.notifications.some((n) => n.dedupeKey === `overdue:${task.id}`),
+    );
+    if (pending.length === 0) return;
+    this.apply((draft, now) => {
+      for (const { id } of pending) {
+        const task = getTask(draft, id);
+        if (!task?.helperId) continue;
+        const helper = draft.users.find((u) => u.id === task.helperId);
+        const requester = draft.users.find((u) => u.id === task.requesterId);
+        addNotification(
+          draft,
+          {
+            userId: task.requesterId,
+            kind: "DEADLINE_SOON",
+            title: `Deadline passed: ${task.title}`,
+            body: `${helper?.name.split(" ")[0] ?? "Your helper"} hasn't started yet. Allow a late finish or cancel the task.`,
+            taskId: task.id,
+            dedupeKey: `overdue:${task.id}`,
+          },
+          now,
+        );
+        addNotification(
+          draft,
+          {
+            userId: task.helperId,
+            kind: "DEADLINE_SOON",
+            title: `Deadline passed: ${task.title}`,
+            body: `Waiting for ${requester?.name.split(" ")[0] ?? "the requester"} to allow a late finish.`,
+            taskId: task.id,
+            dedupeKey: `overdue:${task.id}`,
+          },
+          now,
+        );
+      }
+      return { ok: true, data: undefined };
     });
   }
 

@@ -57,14 +57,25 @@ export function getTask(state: DemoState, taskId: string | undefined): Task | un
   return state.tasks.find((t) => t.id === taskId);
 }
 
+/**
+ * Open tasks expire at their deadline. Accepted tasks never expire on their own:
+ * they become overdue and the requester decides (see isOverdue).
+ */
 export function effectiveStatus(task: Task, now: Date = new Date()): TaskStatus {
-  if (
-    (task.status === "OPEN" || task.status === "ASSIGNED") &&
-    minutesUntil(task.deadline, now) <= 0
-  ) {
+  if (task.status === "OPEN" && minutesUntil(task.deadline, now) <= 0) {
     return "EXPIRED";
   }
   return task.status;
+}
+
+/** An accepted task whose deadline passed before the helper started. */
+export function isOverdue(task: Task, now: Date = new Date()): boolean {
+  return task.status === "ASSIGNED" && minutesUntil(task.deadline, now) <= 0;
+}
+
+/** Overdue and the requester hasn't yet said whether a late finish is OK. */
+export function awaitingLateDecision(task: Task, now: Date = new Date()): boolean {
+  return isOverdue(task, now) && !task.allowLateFinish;
 }
 
 export function isTaskActive(task: Task, now: Date = new Date()): boolean {
@@ -300,8 +311,12 @@ export function canAcceptTask(task: Task, user: User, now: Date = new Date()): b
   );
 }
 
-export function canStartTask(task: Task, user: User): boolean {
-  return task.status === "ASSIGNED" && task.helperId === user.id;
+export function canStartTask(task: Task, user: User, now: Date = new Date()): boolean {
+  return task.status === "ASSIGNED" && task.helperId === user.id && !awaitingLateDecision(task, now);
+}
+
+export function canAllowLateFinish(task: Task, user: User, now: Date = new Date()): boolean {
+  return task.requesterId === user.id && awaitingLateDecision(task, now);
 }
 
 export function canVerifyHandoff(task: Task, user: User): boolean {
@@ -391,12 +406,13 @@ export function getNeedsAction(state: DemoState, user: User, now: Date = new Dat
         return (
           (task.status === "OPEN" && getPendingOffers(state, task.id).length > 0) ||
           task.status === "AWAITING_CONFIRMATION" ||
+          awaitingLateDecision(task, now) ||
           (task.status === "OPEN" && minutesUntil(task.deadline, now) <= 240 && minutesUntil(task.deadline, now) > 0)
         );
       }
       if (task.helperId === user.id) {
         return (
-          task.status === "ASSIGNED" ||
+          (task.status === "ASSIGNED" && !awaitingLateDecision(task, now)) ||
           task.status === "IN_PROGRESS" ||
           task.status === "AWAITING_CONFIRMATION"
         );
@@ -415,7 +431,8 @@ export function nextActivityHint(state: DemoState, task: Task, user: User): stri
         return offers > 0 ? `${offers} offer${offers === 1 ? "" : "s"} to review` : "Waiting for a helper";
       }
       case "ASSIGNED":
-        return "Helper assigned — waiting to start";
+        if (awaitingLateDecision(task)) return "Deadline passed — allow a late finish or cancel";
+        return isOverdue(task) ? "Overdue — late finish allowed" : "Helper assigned — waiting to start";
       case "IN_PROGRESS":
         return "Helper is working on it";
       case "AWAITING_CONFIRMATION":
@@ -428,7 +445,8 @@ export function nextActivityHint(state: DemoState, task: Task, user: User): stri
   }
   switch (task.status) {
     case "ASSIGNED":
-      return "Start the task";
+      if (awaitingLateDecision(task)) return "Overdue — waiting for the requester";
+      return isOverdue(task) ? "Overdue — late finish allowed, start when ready" : "Start the task";
     case "IN_PROGRESS":
       return task.handoffCode && !task.handoffVerified ? "Verify handoff" : "Mark ready";
     case "AWAITING_CONFIRMATION":

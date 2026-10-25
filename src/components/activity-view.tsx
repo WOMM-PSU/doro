@@ -7,6 +7,7 @@ import {
   Banknote,
   CalendarDays,
   ClipboardList,
+  Clock3,
   MapPin,
   Sparkles,
   Star,
@@ -22,6 +23,7 @@ import {
   getPendingOffers,
   taskLocationLabel,
   getNeedsAction,
+  isOverdue,
   getUser,
   getUserStats,
   nextActivityHint,
@@ -68,7 +70,7 @@ export function ActivityView() {
 
     const needs = getNeedsAction(state, user);
     const posted = state.tasks
-      .filter((task) => task.requesterId === user.id && ACTIVE_STATUSES.includes(task.status))
+      .filter((task) => task.requesterId === user.id && ACTIVE_STATUSES.includes(effectiveStatus(task)))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     const accepted = state.tasks
       .filter(
@@ -289,6 +291,12 @@ function ActivityRow({ task, state, user }: { task: Task; state: DemoState; user
             <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-muted">
               {roleLabel}
             </span>
+            {isOverdue(task) ? (
+              <Pill tone="warning">
+                <Clock3 className="size-2.5" aria-hidden />
+                Overdue
+              </Pill>
+            ) : null}
             {offers > 0 ? (
               <Pill tone="lime">
                 {offers} {offers === 1 ? "offer" : "offers"}

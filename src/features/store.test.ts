@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DemoStore, canTransition } from "@/features/store";
 import { createSeedState } from "@/features/seed";
-import { getDiscoverTasks, DEFAULT_FILTERS } from "@/features/selectors";
+import { getDiscoverTasks, DEFAULT_FILTERS, effectiveStatus, isOverdue } from "@/features/selectors";
 import type { Task, TaskDraft } from "@/types";
 
 function makeStore(now = new Date()) {
@@ -388,6 +388,56 @@ describe("demo integrity", () => {
     expect(state.activeUserId).toBe("u-maya");
     expect(state.tasks.find((t) => t.id === "t-notebook")!.status).toBe("OPEN");
     expect(state.payments.filter((p) => p.taskId === "t-notebook")).toHaveLength(0);
+  });
+
+  it("lets the requester decide on a late finish once an accepted task is overdue", () => {
+    const state = createSeedState();
+    state.tasks.find((t) => t.id === "t-assigned-charger")!.deadline = new Date(
+      Date.now() - 10 * 60_000,
+    ).toISOString();
+    const store = new DemoStore(state, { persist: false });
+    const charger = () => task(store, "t-assigned-charger");
+
+    expect(effectiveStatus(charger())).toBe("ASSIGNED");
+    expect(isOverdue(charger())).toBe(true);
+
+    store.setActiveUser("u-alex");
+    expect(store.startTask("t-assigned-charger").ok).toBe(false);
+    expect(store.allowLateFinish("t-assigned-charger").ok).toBe(false);
+
+    store.syncOverdueTasks();
+    store.syncOverdueTasks();
+    const overdueNotes = store.getSnapshot().notifications.filter((n) => n.dedupeKey === "overdue:t-assigned-charger");
+    expect(overdueNotes.map((n) => n.userId).sort()).toEqual(["u-alex", "u-jordan"]);
+
+    store.setActiveUser("u-jordan");
+    expect(store.allowLateFinish("t-assigned-charger").ok).toBe(true);
+    expect(store.allowLateFinish("t-assigned-charger").ok).toBe(false);
+
+    store.setActiveUser("u-alex");
+    expect(store.startTask("t-assigned-charger").ok).toBe(true);
+    expect(charger().status).toBe("IN_PROGRESS");
+  });
+
+  it("lets helpers start late without asking when the poster allowed it up front", () => {
+    const store = makeStore();
+    const created = store.createTask(futureDraft({ allowLateFinish: true }));
+    if (!created.ok) throw new Error(created.error);
+    store.setActiveUser("u-alex");
+    expect(store.acceptTask(created.data.id).ok).toBe(true);
+    store.getSnapshot().tasks.find((t) => t.id === created.data.id)!.deadline = new Date(
+      Date.now() - 60_000,
+    ).toISOString();
+    store.syncOverdueTasks();
+    expect(store.getSnapshot().notifications.some((n) => n.dedupeKey === `overdue:${created.data.id}`)).toBe(false);
+    expect(store.startTask(created.data.id).ok).toBe(true);
+  });
+
+  it("still expires open tasks nobody accepted", () => {
+    const state = createSeedState();
+    const open = state.tasks.find((t) => t.status === "OPEN")!;
+    open.deadline = new Date(Date.now() - 60_000).toISOString();
+    expect(effectiveStatus(open)).toBe("EXPIRED");
   });
 
   it("keeps the welcome dismissed across a reset", () => {

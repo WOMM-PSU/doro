@@ -41,7 +41,9 @@ import {
 } from "@/lib/attachment-store";
 import { useDemo, useUi } from "@/components/providers";
 import {
+  awaitingLateDecision,
   canAcceptTask,
+  canAllowLateFinish,
   canCancelTask,
   canConfirmCompletion,
   canMakeOffer,
@@ -63,6 +65,7 @@ import {
   getUser,
   getUserStats,
   hasCompletedForRequester,
+  isOverdue,
 } from "@/features/selectors";
 import { calculateMatch, CATEGORY_LABELS } from "@/features/matching";
 import { analyzeMessage } from "@/features/moderation";
@@ -206,6 +209,8 @@ export function TaskDetailSheet() {
   const routeMinutes = match?.travelMinutes ?? travelMinutes(routeMiles);
   const handoffNeeded = Boolean(task.handoffCode) && !task.handoffVerified;
   const canReview = canReviewTask(state, task, user);
+  const overdue = isOverdue(task);
+  const waitingOnLateDecision = awaitingLateDecision(task);
 
   const sendMessage = (event: FormEvent) => {
     event.preventDefault();
@@ -297,6 +302,11 @@ export function TaskDetailSheet() {
               if (!result.ok) return toast(result.error, "error");
               toast("Marked ready. The requester has been notified to confirm.", "success");
             }}
+            onAllowLate={() => {
+              const result = store.allowLateFinish(task.id);
+              if (!result.ok) return toast(result.error, "error");
+              toast(`Late finish allowed. ${helper?.name.split(" ")[0] ?? "Your helper"} can still start.`, "success");
+            }}
             onReportTask={() => ui.openReport({ subject: "TASK", taskId: task.id })}
             handoffNeeded={handoffNeeded}
           />
@@ -331,8 +341,27 @@ export function TaskDetailSheet() {
                   Due soon
                 </Pill>
               ) : null}
+              {overdue ? (
+                <Pill tone="warning">
+                  <Clock3 className="size-3" aria-hidden />
+                  Overdue
+                </Pill>
+              ) : null}
             </div>
           </div>
+
+          {overdue && participant ? (
+            <div className="flex items-start gap-2 rounded-xl border border-[#f2e2b9] bg-warning-soft px-3 py-2.5 text-[11.5px] leading-relaxed text-warning">
+              <Clock3 className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <p>
+                {!waitingOnLateDecision
+                  ? `The deadline passed, but a late finish is allowed. ${isHelper ? "You" : helper?.name.split(" ")[0] ?? "Your helper"} can still start.`
+                  : isRequester
+                    ? `The deadline passed before ${helper?.name.split(" ")[0] ?? "your helper"} started. Allow a late finish, or cancel the task${task.paymentMethod === "cash_handoff" ? "" : " to release the card hold"}.`
+                    : `The deadline passed before you started. Waiting for ${requester?.name.split(" ")[0] ?? "the requester"} to allow a late finish.`}
+              </p>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl bg-ink p-4 text-white">
             <div className="flex items-start justify-between gap-4">
@@ -1364,6 +1393,7 @@ function TaskActions({
   onDispute,
   onStart,
   onReady,
+  onAllowLate,
   onReportTask,
   handoffNeeded,
 }: {
@@ -1375,6 +1405,7 @@ function TaskActions({
   onDispute: () => void;
   onStart: () => void;
   onReady: () => void;
+  onAllowLate: () => void;
   onReportTask: () => void;
   handoffNeeded: boolean;
 }) {
@@ -1394,6 +1425,7 @@ function TaskActions({
   const cancelAllowed = canCancelTask(task, user);
   const disputeAllowed = canReportDispute(task, user);
   const reviewAllowed = canReviewTask(state, task, user);
+  const allowLateAllowed = canAllowLateFinish(task, user);
 
   return (
     <div className="space-y-2">
@@ -1435,10 +1467,21 @@ function TaskActions({
               </div>
             </>
           ) : null}
+          {allowLateAllowed ? (
+            <Button variant="lime" onClick={onAllowLate}>
+              <Clock3 className="size-4" aria-hidden />
+              Allow late finish
+            </Button>
+          ) : null}
           {startAllowed ? (
             <Button variant="lime" onClick={onStart}>
               Start task
             </Button>
+          ) : null}
+          {isHelper && awaitingLateDecision(task) ? (
+            <span className="rounded-full bg-muted-surface px-3 py-2 text-[11px] font-medium text-muted">
+              Waiting for the requester
+            </span>
           ) : null}
           {isHelper && status === "IN_PROGRESS" ? (
             <div className="flex flex-col items-end gap-1">
