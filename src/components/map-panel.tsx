@@ -91,8 +91,10 @@ export function MapPanel({
   const leafletModuleRef = useRef<typeof import("leaflet") | null>(null);
 
   const [styleMode, setStyleMode] = useState<MapStyleMode>(STREET_MODES[0]);
-  const [tilesReady, setTilesReady] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [gestureHint, setGestureHint] = useState<string | null>(null);
+  const hintTimerRef = useRef<number | undefined>(undefined);
 
   const selectedRanked = useMemo(
     () =>
@@ -121,12 +123,18 @@ export function MapPanel({
         if (cancelled || !mapContainerRef.current) return;
         leafletModuleRef.current = L;
 
+        // Like embedded Google Maps: the page keeps scrolling over the map.
+        // Ctrl/⌘ + scroll zooms (see the gesture effect); on touch screens one
+        // finger scrolls the page and two fingers pinch to move and zoom.
+        const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
         const map = L.map(mapContainerRef.current, {
           center: PSU_CENTER,
           zoom: compact ? 14.5 : DEFAULT_ZOOM,
           zoomControl: false,
           attributionControl: false,
           zoomSnap: 0.5,
+          scrollWheelZoom: false,
+          dragging: !coarsePointer,
         });
 
         const source = TILE_SOURCES[STREET_MODES[0]];
@@ -135,9 +143,6 @@ export function MapPanel({
           subdomains: source.subdomains ?? "abc",
         });
 
-        tileLayer.on("load", () => {
-          if (!cancelled) setTilesReady(true);
-        });
         tileLayer.on("tileerror", () => {
           // Graceful fallback stays usable via realistic campus blueprint underlay
         });
@@ -153,7 +158,7 @@ export function MapPanel({
         routeLayerRef.current = routeLayer;
         markersLayerRef.current = markersLayer;
         userLayerRef.current = userLayer;
-        setTilesReady(true);
+        setMapReady(true);
       } catch {
         // Headless test environments without full DOM layout fall back cleanly to Blueprint mode
       }
@@ -174,6 +179,45 @@ export function MapPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => () => window.clearTimeout(hintTimerRef.current), []);
+
+  // Explain the scroll/touch gestures the map ignores, and zoom on Ctrl/⌘ + scroll.
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    const element = mapContainerRef.current;
+    if (!mapReady || !map || !element) return;
+    const modifier = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+    const flashHint = (text: string) => {
+      setGestureHint(text);
+      window.clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = window.setTimeout(() => setGestureHint(null), 1400);
+    };
+    let lastZoomAt = 0;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        flashHint(`Use ${modifier} + scroll to zoom the map`);
+        return;
+      }
+      event.preventDefault();
+      // Trackpad pinches fire a burst of ctrl+wheel events; take one step per burst slice.
+      const now = Date.now();
+      if (now - lastZoomAt < 120) return;
+      lastZoomAt = now;
+      map.setZoomAround(map.mouseEventToContainerPoint(event), map.getZoom() + (event.deltaY < 0 ? 0.5 : -0.5));
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length === 1 && !map.dragging.enabled()) {
+        flashHint("Use two fingers to move the map");
+      }
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    element.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+      element.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [mapReady]);
 
   // Switch tile source when styleMode changes
   useEffect(() => {
@@ -316,7 +360,7 @@ export function MapPanel({
     return () => {
       cancelled = true;
     };
-  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen, travelMode]);
+  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen, travelMode, mapReady]);
 
   // Smoothly pan map when user selects a pin from the feed
   useEffect(() => {
@@ -418,7 +462,7 @@ export function MapPanel({
             selectedId={selectedId ?? selectedRanked?.task.id ?? null}
             onSelect={onSelect}
             onOpen={onOpen}
-            interactivePins={!tilesReady || styleMode === "blueprint"}
+            interactivePins={!mapReady || styleMode === "blueprint"}
           />
 
           {/* Live Leaflet Street Map Container (wrapped so React never overwrites Leaflet's .leaflet-container classes) */}
@@ -500,6 +544,17 @@ export function MapPanel({
               </div>
             ) : null}
           </div>
+
+          {gestureHint ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-[25] flex items-center justify-center bg-ink/35 px-6 text-center"
+              role="status"
+            >
+              <span className="rounded-full bg-ink px-3.5 py-2 text-[12px] font-semibold text-white shadow-lift">
+                {gestureHint}
+              </span>
+            </div>
+          ) : null}
 
           {/* Empty State Overlay */}
           {tasks.length === 0 ? (
