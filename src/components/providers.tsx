@@ -54,6 +54,9 @@ interface UiContextValue {
   acceptTaskId: string | null;
   openAccept: (taskId: string) => void;
   closeAccept: () => void;
+  personaOpen: boolean;
+  openPersona: () => void;
+  closePersona: () => void;
 }
 
 const UiContext = createContext<UiContextValue | null>(null);
@@ -154,6 +157,7 @@ function UiProvider({ children }: { children: ReactNode }) {
   const [repostTaskId, setRepostTaskId] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<UiContextValue["reportTarget"]>(null);
   const [acceptTaskId, setAcceptTaskId] = useState<string | null>(null);
+  const [personaOpen, setPersonaOpen] = useState(false);
 
   // Persona switches must never leave a dialog open with permissions from the
   // previous identity.
@@ -182,6 +186,8 @@ function UiProvider({ children }: { children: ReactNode }) {
   const closeReport = useCallback(() => setReportTarget(null), []);
   const openAccept = useCallback((taskId: string) => setAcceptTaskId(taskId), []);
   const closeAccept = useCallback(() => setAcceptTaskId(null), []);
+  const openPersona = useCallback(() => setPersonaOpen(true), []);
+  const closePersona = useCallback(() => setPersonaOpen(false), []);
 
   const value = useMemo<UiContextValue>(
     () => ({
@@ -199,6 +205,9 @@ function UiProvider({ children }: { children: ReactNode }) {
       acceptTaskId,
       openAccept,
       closeAccept,
+      personaOpen,
+      openPersona,
+      closePersona,
     }),
     [
       selectedTaskId,
@@ -215,6 +224,9 @@ function UiProvider({ children }: { children: ReactNode }) {
       acceptTaskId,
       openAccept,
       closeAccept,
+      personaOpen,
+      openPersona,
+      closePersona,
     ],
   );
 

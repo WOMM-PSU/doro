@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
@@ -22,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 import type { UserPreferences } from "@/types";
-import { useDemo } from "@/components/providers";
+import { useDemo, useUi } from "@/components/providers";
 import {
   getPaymentHistory,
   getTask,
@@ -52,6 +51,7 @@ const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as (keyof typeof CATEGORY_LA
 
 export function ProfileView() {
   const { state, user, store } = useDemo();
+  const ui = useUi();
   const { toast } = useToast();
   const [draft, setDraft] = useState<UserPreferences>(user.preferences);
   const [resetOpen, setResetOpen] = useState(false);
@@ -160,13 +160,16 @@ export function ProfileView() {
               </p>
               <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-muted">{user.bio}</p>
             </div>
-            <Link
-              href="#demo-controls"
-              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-[12px] font-medium text-ink hover:bg-muted-surface"
-            >
-              <Users className="size-3.5" aria-hidden />
-              Switch persona
-            </Link>
+            {DEMO_MODE ? (
+              <button
+                type="button"
+                onClick={ui.openPersona}
+                className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-[12px] font-medium text-ink hover:bg-muted-surface"
+              >
+                <Users className="size-3.5" aria-hidden />
+                Switch persona
+              </button>
+            ) : null}
           </div>
 
           <dl className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 sm:grid-cols-4">

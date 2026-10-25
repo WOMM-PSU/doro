@@ -50,7 +50,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { state, user, store } = useDemo();
   const ui = useUi();
   const { toast } = useToast();
-  const [personaOpen, setPersonaOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const unread = unreadCount(state, user.id);
 
@@ -60,11 +59,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const switchPersona = (persona: User) => {
     if (persona.id === user.id) {
-      setPersonaOpen(false);
+      ui.closePersona();
       return;
     }
     store.setActiveUser(persona.id);
-    setPersonaOpen(false);
+    ui.closePersona();
     toast(`Now viewing Doro as ${persona.name}.`, "success");
   };
 
@@ -139,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {DEMO_MODE ? (
           <button
             type="button"
-            onClick={() => setPersonaOpen(true)}
+            onClick={ui.openPersona}
             className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-2.5 text-left transition-colors hover:bg-white/[0.08]"
           >
             <Avatar
@@ -212,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {DEMO_MODE ? (
               <button
                 type="button"
-                onClick={() => setPersonaOpen(true)}
+                onClick={ui.openPersona}
                 className="ml-0.5 rounded-full p-0.5"
                 aria-label={`Current persona: ${user.name}. Switch demo persona`}
               >
@@ -279,8 +278,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {DEMO_MODE ? (
         <PersonaModal
-          open={personaOpen}
-          onClose={() => setPersonaOpen(false)}
+          open={ui.personaOpen}
+          onClose={ui.closePersona}
           onSelect={switchPersona}
           onReset={() => setResetOpen(true)}
         />
@@ -302,7 +301,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onClick={() => {
                 store.resetDemo();
                 setResetOpen(false);
-                setPersonaOpen(false);
+                ui.closePersona();
                 toast("Demo reset to the original sample data.", "success");
               }}
             >
