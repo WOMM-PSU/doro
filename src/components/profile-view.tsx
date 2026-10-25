@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BadgeCheck,
@@ -78,6 +79,33 @@ export function ProfileView() {
   }, [store]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(user.preferences);
+  const router = useRouter();
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+
+  // Unsaved preferences: confirm before following an in-app link, and let the
+  // browser warn before the tab closes or reloads.
+  useEffect(() => {
+    if (!dirty) return;
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setLeaveTo(url.pathname + url.search + url.hash);
+    };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [dirty]);
 
   const toggleCategory = (category: keyof typeof CATEGORY_LABELS) => {
     const has = draft.categories.includes(category);
@@ -732,6 +760,53 @@ export function ProfileView() {
           </div>
         </aside>
       </div>
+
+      <Modal
+        open={Boolean(leaveTo)}
+        onClose={() => setLeaveTo(null)}
+        title="Leave without saving?"
+        description="Your preference changes haven't been saved yet."
+        size="sm"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setLeaveTo(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const target = leaveTo;
+                setDraft(user.preferences);
+                setLeaveTo(null);
+                if (target) router.push(target);
+              }}
+            >
+              Discard changes
+            </Button>
+            <Button
+              variant="dark"
+              onClick={() => {
+                const target = leaveTo;
+                const result = store.updatePreferences(draft);
+                if (!result.ok) {
+                  setLeaveTo(null);
+                  toast(result.error, "error");
+                  return;
+                }
+                setLeaveTo(null);
+                toast("Preferences saved.", "success");
+                if (target) router.push(target);
+              }}
+            >
+              Save and leave
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-relaxed text-muted">
+          Leaving now drops the changes to your discovery preferences.
+        </p>
+      </Modal>
 
       <Modal
         open={DEMO_MODE && resetOpen}
