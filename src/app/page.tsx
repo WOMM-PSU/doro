@@ -14,10 +14,11 @@ import {
 import { DoroLogo, DoroMark } from "@/components/brand";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import { createSeedState } from "@/features/seed";
-import { calculateMatch } from "@/features/matching";
+import { CATEGORY_LABELS, calculateMatch } from "@/features/matching";
 import { getUser } from "@/features/selectors";
-import { formatDeadline } from "@/lib/time";
-import { formatMiles } from "@/lib/format";
+import { getLocation } from "@/lib/locations";
+import { formatMiles, formatMoney, formatTravel } from "@/lib/format";
+import { LocalDeadline } from "@/components/local-deadline";
 
 export const dynamic = "force-dynamic";
 
@@ -130,14 +131,14 @@ export default function LandingPage() {
                     Discover · near you
                   </span>
                   <span className="rounded-full bg-surface px-2 py-1 text-[9.5px] font-medium text-muted">
-                    0.4 mi
+                    {formatMiles(match.routeMiles)}
                   </span>
                 </div>
                 <article className="rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-5">
                   <div className="flex items-start justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-muted-surface px-2 py-1 text-[9.5px] font-semibold uppercase tracking-wide text-muted">
                       <MapPin className="size-3" aria-hidden />
-                      Pickup & delivery
+                      {CATEGORY_LABELS[notebook.category]}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-lime-soft px-2 py-1 text-[9.5px] font-semibold text-[#4d6028]">
                       <Sparkles className="size-3" aria-hidden />
@@ -153,30 +154,37 @@ export default function LandingPage() {
                   <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-muted">
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="size-3" aria-hidden />
-                      West Halls → Pattee
+                      {getLocation(notebook.locationId).shortLabel}
+                      {notebook.dropoffLocationId ? ` → ${getLocation(notebook.dropoffLocationId).shortLabel}` : ""}
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <NavigationArrow />
-                      {formatMiles(match.routeMiles)} · ~{match.travelMinutes} min walk
+                      {formatMiles(match.routeMiles)} ·{" "}
+                      {formatTravel(match.travelMinutes, alex.preferences.travelMode)}
                     </span>
-                    <span>{formatDeadline(notebook.deadline)}</span>
+                    <LocalDeadline iso={notebook.deadline} />
                   </div>
                   <div className="mt-3 rounded-lg bg-[#f7faf0] px-2.5 py-2 text-[10px] leading-relaxed text-[#4d6528]">
                     {match.explanation.slice(0, 2).join(" · ")}
                   </div>
                   <div className="mt-4 flex items-end justify-between border-t border-line pt-3.5">
                     <div>
-                      <p className="tabular font-mono text-2xl font-semibold text-ink">$5.00</p>
+                      <p className="tabular font-mono text-2xl font-semibold text-ink">
+                        {formatMoney(notebook.rewardCents)}
+                      </p>
                       <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-[#f3d2b8] text-[8px] font-semibold text-ink">
-                          MC
+                        <span
+                          className="flex size-5 items-center justify-center rounded-full text-[8px] font-semibold text-ink"
+                          style={{ backgroundColor: maya.avatarColor }}
+                        >
+                          {maya.initials}
                         </span>
                         {maya.name}
                         <Stars />
                       </p>
                     </div>
                     <span className="inline-flex h-9 items-center rounded-full bg-lime px-4 text-[11px] font-semibold text-ink">
-                      Accept · $5
+                      Accept · {formatMoney(notebook.rewardCents, { compact: true })}
                     </span>
                   </div>
                 </article>
