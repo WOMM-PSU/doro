@@ -394,6 +394,12 @@ export function Checkbox({
 /* Modal                                                                      */
 /* -------------------------------------------------------------------------- */
 
+// Dialogs can stack (e.g. Report over a task sheet). Only the topmost one
+// handles keys, and the body scroll lock is released once the last one closes,
+// whatever order they unmount in.
+const openModals: symbol[] = [];
+let overflowBeforeModals = "";
+
 export function Modal({
   open,
   onClose,
@@ -422,8 +428,12 @@ export function Modal({
   useEffect(() => {
     if (!open) return;
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const token = Symbol("modal");
+    if (openModals.length === 0) {
+      overflowBeforeModals = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    openModals.push(token);
     const focusTimer = window.setTimeout(() => {
       const target =
         panelRef.current?.querySelector<HTMLElement>("[data-autofocus]") ??
@@ -434,6 +444,7 @@ export function Modal({
     }, 30);
 
     const handleKey = (event: KeyboardEvent) => {
+      if (openModals[openModals.length - 1] !== token) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
@@ -461,7 +472,8 @@ export function Modal({
     return () => {
       document.removeEventListener("keydown", handleKey);
       window.clearTimeout(focusTimer);
-      document.body.style.overflow = previousOverflow;
+      openModals.splice(openModals.indexOf(token), 1);
+      if (openModals.length === 0) document.body.style.overflow = overflowBeforeModals;
       previousActive?.focus?.();
     };
   }, [open]);
