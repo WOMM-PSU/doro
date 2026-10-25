@@ -888,12 +888,7 @@ export function PostTaskDialog() {
                       Estimated from task details
                     </span>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted-surface">
-                    <div
-                      className="h-full rounded-full bg-lime-deep"
-                      style={{ width: "62%", marginLeft: "14%" }}
-                    />
-                  </div>
+                  <RewardScale recommendation={recommendation} rewardCents={rewardCents} />
                   <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
                     Typical around {formatMoney(recommendation.typicalCents)} for ~
                     {recommendation.totalMinutes} min of effort and travel. Based on category, time,
@@ -1239,6 +1234,33 @@ export function PostTaskDialog() {
         <p className="text-sm text-muted">Nothing was posted, so nobody else saw this draft.</p>
       </Modal>
     </>
+  );
+}
+
+/** Suggested range as a band, with a marker where the current reward sits. */
+function RewardScale({
+  recommendation,
+  rewardCents,
+}: {
+  recommendation: RewardRecommendation;
+  rewardCents: number;
+}) {
+  const scale = Math.max(recommendation.maxCents * 1.5, rewardCents, 100);
+  const percent = (cents: number) => `${Math.min(100, (cents / scale) * 100)}%`;
+  return (
+    <div className="relative mt-2 h-1.5 rounded-full bg-muted-surface" aria-hidden>
+      <div
+        className="absolute inset-y-0 rounded-full bg-lime-deep"
+        style={{
+          left: percent(recommendation.minCents),
+          width: `calc(${percent(recommendation.maxCents)} - ${percent(recommendation.minCents)})`,
+        }}
+      />
+      <div
+        className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-ink shadow-soft transition-[left] duration-150"
+        style={{ left: percent(rewardCents) }}
+      />
+    </div>
   );
 }
 
