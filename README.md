@@ -17,7 +17,7 @@ Useful scripts:
 
 ```bash
 npm run typecheck  # tsc --noEmit
-npm test           # Vitest (53 tests)
+npm test           # Vitest (57 tests)
 npm run build      # production build
 npm start          # serve the production build
 ```
