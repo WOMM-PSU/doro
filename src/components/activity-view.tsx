@@ -8,7 +8,6 @@ import {
   CalendarDays,
   ClipboardList,
   MapPin,
-  Plus,
   Sparkles,
   Star,
 } from "lucide-react";
@@ -114,31 +113,25 @@ export function ActivityView() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
-            <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
-            Your tasks
-          </div>
-          <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[38px]">
-            My activity
-          </h1>
-          <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted">
-            Everything you posted or accepted, with the next useful action in each state.
-            {counts.needs > 0 ? (
-              <span className="font-medium text-ink">
-                {" "}
-                {counts.needs} {counts.needs === 1 ? "task needs" : "tasks need"} you.
-              </span>
-            ) : (
-              " Nothing needs you right now."
-            )}
-          </p>
+      <header>
+        <div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
+          Your tasks
         </div>
-        <Button variant="lime" onClick={ui.openCompose}>
-          <Plus className="size-4" aria-hidden />
-          Post a task
-        </Button>
+        <h1 className="mt-2 text-[30px] font-semibold leading-[1.03] tracking-[-0.035em] text-ink sm:text-[38px]">
+          My activity
+        </h1>
+        <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-muted">
+          Everything you posted or accepted, with the next useful action in each state.
+          {counts.needs > 0 ? (
+            <span className="font-medium text-ink">
+              {" "}
+              {counts.needs} {counts.needs === 1 ? "task needs" : "tasks need"} you.
+            </span>
+          ) : (
+            " Nothing needs you right now."
+          )}
+        </p>
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -180,21 +173,13 @@ export function ActivityView() {
           title={emptyTitle(tab)}
           description={emptyDescription(tab)}
           action={
-            <div className="flex flex-wrap justify-center gap-2">
-              {tab === "needs" || tab === "posted" ? (
-                <Button variant="lime" onClick={ui.openCompose}>
-                  <Plus className="size-4" aria-hidden />
-                  Post a task
-                </Button>
-              ) : null}
-              <Link
-                href="/discover"
-                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-5 text-sm font-medium text-ink hover:bg-muted-surface"
-              >
-                Explore nearby tasks
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </div>
+            <Link
+              href="/discover"
+              className="inline-flex h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-5 text-sm font-medium text-ink hover:bg-muted-surface"
+            >
+              Explore nearby tasks
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
           }
         />
       ) : (

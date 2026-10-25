@@ -8,7 +8,6 @@ import {
   List,
   Map as MapIcon,
   MapPin,
-  Plus,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -291,15 +290,9 @@ export function DiscoverView() {
                     : "Try a wider distance, a lower reward floor, or clear your filters. You can also post the first request."
                 }
                 action={
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button variant="outline" onClick={resetFilters}>
-                      Clear filters
-                    </Button>
-                    <Button variant="lime" onClick={ui.openCompose}>
-                      <Plus className="size-4" aria-hidden />
-                      Post a task
-                    </Button>
-                  </div>
+                  <Button variant="outline" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
                 }
               />
             ) : (
