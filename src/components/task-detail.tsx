@@ -1553,9 +1553,6 @@ function TaskActions({
           </Button>
         </div>
       </div>
-      <p className="text-right text-[9.5px] text-muted">
-        DEMO MODE · Simulated payments, no real charge or transfer.
-      </p>
     </div>
   );
 }
