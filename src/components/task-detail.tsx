@@ -77,6 +77,7 @@ import {
   refundStripeEscrowHold,
 } from "@/lib/stripe-client";
 import { formatMoney } from "@/lib/format";
+import { paymentLabels } from "@/lib/payment-labels";
 import { formatDeadline, formatRelative, formatTimeLeft, formatTimeOnly, minutesUntil } from "@/lib/time";
 import {
   Avatar,
@@ -90,25 +91,6 @@ import {
   cn,
   useToast,
 } from "@/components/ui";
-
-const PAYMENT_LABEL: Record<string, { title: string; body: string }> = {
-  DEMO_AUTHORIZED: {
-    title: "Demo payment authorized",
-    body: "No real money has been charged.",
-  },
-  DEMO_RELEASED: {
-    title: "Demo payout recorded",
-    body: "No actual transfer occurred.",
-  },
-  DEMO_REFUNDED: {
-    title: "Demo authorization released",
-    body: "No real money was ever charged.",
-  },
-  DEMO_DISPUTED: {
-    title: "Demo payment paused",
-    body: "No real money has moved while the problem is reviewed.",
-  },
-};
 
 type LocalDialog = "offer" | "review" | "cancel" | "dispute" | "complete" | null;
 
@@ -209,6 +191,10 @@ export function TaskDetailSheet() {
   const routeMinutes = match?.travelMinutes ?? travelMinutes(routeMiles);
   const handoffNeeded = Boolean(task.handoffCode) && !task.handoffVerified;
   const canReview = canReviewTask(state, task, user);
+  const isCash = task.paymentMethod === "cash_handoff";
+  const paymentCopy = payment
+    ? paymentLabels({ state: payment.state, paymentMethod: payment.paymentMethod ?? task.paymentMethod })
+    : null;
   const overdue = isOverdue(task);
   const waitingOnLateDecision = awaitingLateDecision(task);
 
@@ -971,20 +957,10 @@ export function TaskDetailSheet() {
                       ? "Cash at Handoff"
                       : "Stripe Card Escrow"}
                   </h3>
-                  <p className="mt-0.5 text-[11.5px] text-muted">
-                    {PAYMENT_LABEL[payment.state]?.title ?? payment.state}
-                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-muted">{paymentCopy?.title}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <Pill tone={payment.state === "DEMO_DISPUTED" ? "danger" : payment.state === "DEMO_RELEASED" ? "success" : "neutral"}>
-                    {payment.state === "DEMO_RELEASED"
-                      ? "Paid out"
-                      : payment.state === "DEMO_AUTHORIZED"
-                        ? "Hold active"
-                        : payment.state === "DEMO_REFUNDED"
-                          ? "Released"
-                          : "Paused"}
-                  </Pill>
+                  <Pill tone={paymentCopy?.tone}>{paymentCopy?.status}</Pill>
                   {payment.stripePaymentIntentId && task.paymentMethod !== "cash_handoff" ? (
                     <span className="font-mono text-[9px] text-muted">
                       {payment.stripePaymentIntentId.slice(0, 15)}…
@@ -1009,7 +985,7 @@ export function TaskDetailSheet() {
                 </div>
                 <div className="flex justify-between gap-3 border-t border-line pt-2">
                   <dt className="font-medium text-ink">
-                    {payment.state === "DEMO_RELEASED" ? "Total paid out" : "Total authorized hold"}
+                    {paymentCopy?.totalLabel}
                   </dt>
                   <dd className="tabular font-semibold text-ink">
                     {formatMoney(payment.rewardCents + (task.expenseCents ?? 0))}
@@ -1018,9 +994,9 @@ export function TaskDetailSheet() {
               </dl>
               <p className="mt-2.5 flex items-start gap-1.5 rounded-xl bg-muted-surface px-3 py-2 text-[10.5px] leading-relaxed text-muted">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                {task.paymentMethod === "cash_handoff"
-                  ? "Settle directly with the helper in cash at handoff once the 4-digit code is confirmed."
-                  : `${PAYMENT_LABEL[payment.state]?.body ?? "Card hold placed via Stripe API."} Real Stripe credentials in .env activate live processing.`}
+                {isCash
+                  ? paymentCopy?.body
+                  : `${paymentCopy?.body} Real Stripe credentials in .env activate live processing.`}
               </p>
             </section>
           ) : null}
@@ -1033,7 +1009,9 @@ export function TaskDetailSheet() {
                   <h3 className="text-[13px] font-semibold text-success">Task completed</h3>
                   <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#3f6a4e]">
                     {task.completedAt ? `Confirmed ${formatRelative(task.completedAt)}. ` : ""}
-                    {formatMoney(reward)} recorded in the demo ledger. No real transfer occurred.
+                    {isCash
+                      ? `${formatMoney(reward)} settled in cash at handoff.`
+                      : `${formatMoney(reward)} recorded in the demo ledger. No real transfer occurred.`}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {reviews.map((item) => {
@@ -1076,8 +1054,10 @@ export function TaskDetailSheet() {
                 Problem reported
               </h3>
               <p className="mt-1 text-[11.5px] leading-relaxed text-[#7c4141]">
-                {task.disputeReason ?? "The task is paused while both people review it."} The demo
-                payment is paused; no real money has moved.
+                {task.disputeReason ?? "The task is paused while both people review it."}{" "}
+                {isCash
+                  ? "Hold off on paying in cash until it's sorted out."
+                  : "The demo payment is paused; no real money has moved."}
               </p>
             </section>
           ) : null}
@@ -1086,8 +1066,10 @@ export function TaskDetailSheet() {
             <section className="rounded-2xl border border-line bg-muted-surface p-4">
               <h3 className="text-[13px] font-semibold text-ink">Cancelled</h3>
               <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
-                {task.cancelReason ? `Reason: ${task.cancelReason}` : "This task was cancelled."} Any
-                demo authorization was released; no real charge occurred.
+                {task.cancelReason ? `Reason: ${task.cancelReason}` : "This task was cancelled."}{" "}
+                {isCash
+                  ? "No cash is owed."
+                  : "Any demo authorization was released; no real charge occurred."}
               </p>
             </section>
           ) : null}
@@ -1215,7 +1197,12 @@ export function TaskDetailSheet() {
           if (!result.ok) return toast(result.error, "error");
           setDialog(null);
           setDisputeReason("");
-          toast("Problem reported. The demo payment is paused pending review.", "default");
+          toast(
+            isCash
+              ? "Problem reported. Hold off on paying in cash until it's sorted out."
+              : "Problem reported. The demo payment is paused pending review.",
+            "default",
+          );
         }}
       />
 
