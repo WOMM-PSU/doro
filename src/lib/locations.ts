@@ -1,7 +1,9 @@
 /**
- * Approximate demo campus locations near University Park, PA.
+ * Campus locations at University Park, PA. Coordinates are the OpenStreetMap
+ * positions of each building (or the centre of a residence-hall group),
+ * rounded to about 10 m, so labels and pins sit on the right streets.
  *
- * These coordinates exist only to calculate straight-line demo distances.
+ * They are used to calculate straight-line demo distances.
  * They are not live user positions and must not be presented as precise
  * navigation. Travel times are labelled estimates throughout the UI.
  */
@@ -22,7 +24,7 @@ export const LOCATIONS: DemoLocation[] = [
     name: "HUB-Robeson Center",
     shortLabel: "the HUB",
     lat: 40.7982,
-    lng: -77.8601,
+    lng: -77.861,
     category: "campus",
     area: "Campus core",
   },
@@ -30,8 +32,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "pattee",
     name: "Pattee & Paterno Libraries",
     shortLabel: "Pattee Library",
-    lat: 40.7992,
-    lng: -77.8628,
+    lat: 40.7981,
+    lng: -77.8658,
     category: "study",
     area: "Library mall",
   },
@@ -39,8 +41,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "west-halls",
     name: "West Halls",
     shortLabel: "West Halls",
-    lat: 40.7966,
-    lng: -77.8664,
+    lat: 40.7962,
+    lng: -77.8673,
     category: "residence",
     area: "West campus",
   },
@@ -48,17 +50,17 @@ export const LOCATIONS: DemoLocation[] = [
     id: "pollock-halls",
     name: "Pollock Halls",
     shortLabel: "Pollock Halls",
-    lat: 40.7978,
-    lng: -77.8557,
+    lat: 40.802,
+    lng: -77.8565,
     category: "residence",
-    area: "East of the HUB",
+    area: "Northeast of the HUB",
   },
   {
     id: "east-halls",
     name: "East Halls",
     shortLabel: "East Halls",
-    lat: 40.8006,
-    lng: -77.8498,
+    lat: 40.8056,
+    lng: -77.8618,
     category: "residence",
     area: "East campus",
   },
@@ -66,8 +68,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "south-halls",
     name: "South Halls",
     shortLabel: "South Halls",
-    lat: 40.7942,
-    lng: -77.8589,
+    lat: 40.799,
+    lng: -77.858,
     category: "residence",
     area: "South campus",
   },
@@ -75,8 +77,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "north-halls",
     name: "North Halls",
     shortLabel: "North Halls",
-    lat: 40.8034,
-    lng: -77.8548,
+    lat: 40.8029,
+    lng: -77.8665,
     category: "residence",
     area: "North campus",
   },
@@ -84,8 +86,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "willard",
     name: "Willard Building",
     shortLabel: "Willard",
-    lat: 40.7962,
-    lng: -77.8596,
+    lat: 40.7958,
+    lng: -77.8646,
     category: "campus",
     area: "Campus core",
   },
@@ -93,17 +95,17 @@ export const LOCATIONS: DemoLocation[] = [
     id: "kern",
     name: "Kern Building",
     shortLabel: "Kern",
-    lat: 40.7971,
-    lng: -77.8624,
+    lat: 40.7973,
+    lng: -77.8685,
     category: "campus",
-    area: "Library mall",
+    area: "West campus",
   },
   {
     id: "findlay",
     name: "Findlay Commons",
     shortLabel: "Findlay Commons",
-    lat: 40.8013,
-    lng: -77.8504,
+    lat: 40.8064,
+    lng: -77.8623,
     category: "dining",
     area: "East campus",
   },
@@ -111,8 +113,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "downtown",
     name: "Downtown State College",
     shortLabel: "downtown",
-    lat: 40.7946,
-    lng: -77.8607,
+    lat: 40.7937,
+    lng: -77.861,
     category: "town",
     area: "College Ave",
   },
@@ -120,8 +122,8 @@ export const LOCATIONS: DemoLocation[] = [
     id: "redifer",
     name: "Redifer Commons",
     shortLabel: "Redifer Commons",
-    lat: 40.794,
-    lng: -77.858,
+    lat: 40.7996,
+    lng: -77.8558,
     category: "dining",
     area: "South campus",
   },
@@ -207,10 +209,10 @@ export function estimateRouteMiles(
 
 /** Normalized 0–1 map position within the demo campus bounds. */
 export function mapPosition(location: DemoLocation): { x: number; y: number } {
-  const minLat = 40.7925;
-  const maxLat = 40.8055;
-  const minLng = -77.8695;
-  const maxLng = -77.8465;
+  const minLat = 40.792;
+  const maxLat = 40.808;
+  const minLng = -77.872;
+  const maxLng = -77.853;
   const x = ((location.lng - minLng) / (maxLng - minLng)) * 100;
   const y = ((maxLat - location.lat) / (maxLat - minLat)) * 100;
   return {

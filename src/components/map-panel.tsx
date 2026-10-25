@@ -25,7 +25,7 @@ import { cn, useToast } from "@/components/ui";
 
 type MapStyleMode = "voyager" | "osm" | "blueprint";
 
-const PSU_CENTER: [number, number] = [40.7982, -77.8588];
+const PSU_CENTER: [number, number] = [40.8, -77.8625];
 const DEFAULT_ZOOM = 15;
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY;
 // CARTO tiles render an "API KEY REQUIRED" watermark without a key, so the
@@ -820,26 +820,26 @@ function CampusBlueprintUnderlay({
           <line x1="64" y1="10" x2="67" y2="94" strokeWidth="2.2" />
         </g>
 
-        {/* Architectural Building Footprints */}
+        {/* Building footprints, placed at each location's map position (see mapPosition) */}
         <g fill="#d5d9ce" stroke="#bfc5b6" strokeWidth="0.4">
           {/* Pattee & Paterno Library */}
-          <rect x="26" y="44" width="6.5" height="4.2" rx="0.6" />
+          <rect x="29.4" y="57.1" width="6.5" height="4.2" rx="0.6" />
           {/* Kern */}
-          <rect x="28" y="61" width="4.5" height="3.5" rx="0.6" />
+          <rect x="16.1" y="62.8" width="4.5" height="3.5" rx="0.6" />
           {/* West Halls */}
-          <rect x="11" y="65" width="6" height="5" rx="0.6" />
+          <rect x="21.7" y="68.2" width="6" height="5" rx="0.6" />
           {/* Willard */}
-          <rect x="40" y="68" width="5.5" height="3.8" rx="0.6" />
+          <rect x="36.1" y="71.9" width="5.5" height="3.8" rx="0.6" />
           {/* HUB-Robeson Center */}
-          <rect x="49" y="53" width="7.2" height="4.6" rx="0.8" />
+          <rect x="54.3" y="56.0" width="7.2" height="4.6" rx="0.6" />
           {/* Pollock Halls */}
-          <rect x="68" y="56" width="6.5" height="4.8" rx="0.6" />
+          <rect x="78.3" y="32.1" width="6.5" height="4.8" rx="0.6" />
           {/* East Halls & Findlay */}
-          <rect x="82" y="32" width="7.5" height="6" rx="0.8" />
+          <rect x="50.0" y="8.4" width="7.5" height="6" rx="0.6" />
           {/* North Halls */}
-          <rect x="61" y="15" width="5.5" height="4.2" rx="0.6" />
+          <rect x="26.1" y="27.1" width="5.5" height="4.2" rx="0.6" />
           {/* South Halls & Redifer */}
-          <rect x="53" y="82" width="6.5" height="4.5" rx="0.6" />
+          <rect x="70.5" y="51.2" width="6.5" height="4.5" rx="0.6" />
         </g>
 
         {/* Street Names */}
