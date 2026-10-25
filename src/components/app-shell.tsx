@@ -20,7 +20,6 @@ import { DoroLogo } from "@/components/brand";
 import {
   Avatar,
   Button,
-  IconButton,
   Modal,
   cn,
   useToast,
@@ -197,11 +196,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               href="/notifications"
               aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
-              className="relative"
+              title="Notifications"
+              className="relative inline-flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-muted-surface hover:text-ink"
             >
-              <IconButton label="Notifications">
-                <Bell className="size-5" />
-              </IconButton>
+              <Bell className="size-5" aria-hidden />
               {unread > 0 ? (
                 <span className="tabular absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-canvas bg-ink px-1 text-[9px] font-bold text-lime">
                   {unread}
