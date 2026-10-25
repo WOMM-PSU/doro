@@ -63,7 +63,7 @@ function LoadingScreen() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas">
       <DoroLogo size={38} />
-      <p className="text-sm text-muted">A little help, for a fair price.</p>
+      <p className="text-sm text-muted">Get your stuff done.</p>
     </div>
   );
 }

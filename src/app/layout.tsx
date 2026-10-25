@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Doro — A little help, for a fair price",
+    default: "Doro — Get your stuff done.",
     template: "%s · Doro",
   },
   description:

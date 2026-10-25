@@ -122,7 +122,7 @@ export function DiscoverView() {
             {greeting()}, {firstName}.
           </h1>
           <p className="mt-2.5 max-w-xl text-[13.5px] leading-relaxed text-muted sm:text-sm">
-            <span className="font-medium text-ink">A little help, for a fair price.</span> Find a
+            <span className="font-medium text-ink">Get your stuff done.</span> Find a
             nearby task that fits your time, or post one of your own.
           </p>
         </div>

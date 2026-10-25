@@ -2,7 +2,7 @@
   "name": "doro",
   "version": "1.0.0",
   "private": true,
-  "description": "Doro — a little help, for a fair price. A local peer-to-peer task marketplace demo.",
+  "description": "Doro — get your stuff done. A local peer-to-peer task marketplace demo.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

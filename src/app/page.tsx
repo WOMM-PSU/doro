@@ -68,9 +68,9 @@ export default function LandingPage() {
                 University Park · local help
               </div>
               <h1 className="mt-5 max-w-[560px] text-[44px] font-semibold leading-[0.98] tracking-[-0.045em] text-ink sm:text-[60px] lg:text-[66px]">
-                A little help,{" "}
+                Get your stuff{" "}
                 <span className="relative inline-block">
-                  <span className="relative z-10">for a fair price.</span>
+                  <span className="relative z-10">done.</span>
                   <span
                     aria-hidden
                     className="absolute inset-x-0 bottom-[0.04em] z-0 h-[0.32em] rounded-sm bg-lime"
@@ -432,7 +432,7 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-[11px] text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2.5">
             <DoroLogo size={24} />
-            <span>A little help, for a fair price.</span>
+            <span>Get your stuff done.</span>
           </div>
           <p className="max-w-md leading-relaxed">
             A hackathon demo. Fictional people, approximate campus locations and simulated payments.
