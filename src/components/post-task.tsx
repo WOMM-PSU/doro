@@ -83,7 +83,7 @@ export function PostTaskDialog() {
   const [customDeadline, setCustomDeadline] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState(15);
   const [durationTouched, setDurationTouched] = useState(false);
-  const [rewardInput, setRewardInput] = useState("6.00");
+  const [rewardInput, setRewardInput] = useState("");
   const [rewardTouched, setRewardTouched] = useState(false);
   const [acceptanceMode, setAcceptanceMode] = useState<AcceptanceMode>("fixed");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("stripe_card");
@@ -101,7 +101,6 @@ export function PostTaskDialog() {
 
   const isDelivery = category === "delivery";
   const deadline = useMemo(() => resolveDeadline(preset, customDeadline), [preset, customDeadline]);
-  const rewardCents = Math.max(0, Math.round(Number(rewardInput || 0) * 100));
   const expenseCents = expenseInput.trim() ? Math.max(0, Math.round(Number(expenseInput) * 100)) : 0;
 
   const recommendation = useMemo(
@@ -117,16 +116,14 @@ export function PostTaskDialog() {
     [category, estimatedMinutes, deadline, isDelivery, pickupId, dropoffId, locationId, expenseCents],
   );
 
+  // Until the requester edits the reward, it follows the typical suggestion.
+  const rewardValue = rewardTouched ? rewardInput : (recommendation.typicalCents / 100).toFixed(2);
+  const rewardCents = Math.max(0, Math.round(Number(rewardValue || 0) * 100));
+
   const inference = useMemo(
     () => inferTaskDetails(`${title} ${description}`),
     [title, description],
   );
-
-  useEffect(() => {
-    if (!rewardTouched) {
-      setRewardInput((recommendation.typicalCents / 100).toFixed(2));
-    }
-  }, [recommendation.typicalCents, rewardTouched]);
 
   const resetAll = () => {
     setTitle("");
@@ -191,7 +188,7 @@ export function PostTaskDialog() {
     if (!Number.isFinite(estimatedMinutes) || estimatedMinutes < 5 || estimatedMinutes > 240) {
       next.duration = "Estimate between 5 and 240 minutes.";
     }
-    if (!Number.isFinite(Number(rewardInput)) || rewardCents < 100) {
+    if (!Number.isFinite(Number(rewardValue)) || rewardCents < 100) {
       next.reward = "Set a reward of at least $1.00.";
     }
     if (rewardCents > 100_000) next.reward = "This demo supports rewards up to $1,000.";
@@ -693,7 +690,7 @@ export function PostTaskDialog() {
                         min={1}
                         max={1000}
                         step="0.50"
-                        value={rewardInput}
+                        value={rewardValue}
                         onChange={(e) => {
                           setRewardInput(e.target.value);
                           setRewardTouched(true);
@@ -728,7 +725,7 @@ export function PostTaskDialog() {
                   min={1}
                   max={40}
                   step={0.5}
-                  value={Math.min(40, Math.max(1, Number(rewardInput) || 1))}
+                  value={Math.min(40, Math.max(1, Number(rewardValue) || 1))}
                   onChange={(e) => {
                     setRewardInput(Number(e.target.value).toFixed(2));
                     setRewardTouched(true);
