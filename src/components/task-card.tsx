@@ -139,6 +139,7 @@ export function TaskCard({
             <Money cents={task.rewardCents} size="lg" />
             <span className="text-[10.5px] font-medium text-muted">
               {task.acceptanceMode === "offers" ? "or make an offer" : "fixed reward"}
+              {task.paymentMethod === "cash_handoff" ? " · cash" : ""}
             </span>
           </div>
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5">

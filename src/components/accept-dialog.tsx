@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarDays, Clock3, MapPin, ShieldCheck } from "lucide-react";
+import { Banknote, CalendarDays, Clock3, CreditCard, MapPin, ShieldCheck } from "lucide-react";
 import { useDemo, useUi } from "@/components/providers";
 import { canAcceptTask, getTask, getUser } from "@/features/selectors";
 import { getLocation } from "@/lib/locations";
+import { createStripeEscrowHold } from "@/lib/stripe-client";
 import { formatDeadline } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
 import { Avatar, Button, Modal, StatusBadge, useToast } from "@/components/ui";
@@ -49,9 +50,29 @@ export function AcceptTaskDialog() {
                 toast(result.error, "error");
                 return;
               }
+              if ((task.paymentMethod ?? "stripe_card") === "stripe_card") {
+                void createStripeEscrowHold({
+                  taskId: task.id,
+                  title: task.title,
+                  rewardCents: reward,
+                  expenseCents: task.expenseCents ?? 0,
+                  requesterId: task.requesterId,
+                  helperId: user.id,
+                }).then((intent) => {
+                  if (intent.ok && intent.paymentIntentId) {
+                    store.attachStripePaymentIntent(
+                      task.id,
+                      intent.paymentIntentId,
+                      intent.mode ?? "test_fallback",
+                    );
+                  }
+                });
+              }
               ui.closeAccept();
               toast(
-                `Task accepted. ${formatMoney(reward)} is recorded as a demo authorization — no real money moves.`,
+                task.paymentMethod === "cash_handoff"
+                  ? `Task accepted. ${formatMoney(reward)} is due in cash at handoff.`
+                  : `Task accepted. ${formatMoney(reward + (task.expenseCents ?? 0))} Stripe card hold authorized.`,
                 "success",
               );
               ui.openTask(task.id);
@@ -76,7 +97,9 @@ export function AcceptTaskDialog() {
               <p className="tabular text-2xl font-semibold tracking-tight text-ink">
                 {formatMoney(reward)}
               </p>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted">Demo reward</p>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
+                {task.paymentMethod === "cash_handoff" ? "Cash at Handoff" : "Stripe Card Hold"}
+              </p>
             </div>
           </div>
           <dl className="mt-3 grid grid-cols-1 gap-2 border-t border-line pt-3 text-xs sm:grid-cols-2">
@@ -101,6 +124,40 @@ export function AcceptTaskDialog() {
               </div>
             </div>
           </dl>
+          <div className="mt-3 space-y-1.5 border-t border-line pt-3 text-xs">
+            <div className="flex items-center justify-between text-muted">
+              <span className="inline-flex items-center gap-1.5 font-medium text-ink">
+                {task.paymentMethod === "cash_handoff" ? (
+                  <>
+                    <Banknote className="size-3.5 text-[#587d2a]" aria-hidden />
+                    Cash at Handoff
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="size-3.5 text-[#587d2a]" aria-hidden />
+                    Stripe Card Escrow
+                  </>
+                )}
+              </span>
+              <span className="tabular font-semibold text-ink">
+                {formatMoney(reward + (task.expenseCents ?? 0))} total
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted">
+              <span>Task reward</span>
+              <span className="tabular">{formatMoney(reward)}</span>
+            </div>
+            {task.expenseCents ? (
+              <div className="flex items-center justify-between text-[11px] text-muted">
+                <span>Expense reimbursement</span>
+                <span className="tabular">up to {formatMoney(task.expenseCents)}</span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between text-[11px] text-muted">
+              <span>Campus platform fee</span>
+              <span className="tabular font-medium text-[#587d2a]">$0.00</span>
+            </div>
+          </div>
         </div>
 
         {requester ? (
@@ -128,7 +185,7 @@ export function AcceptTaskDialog() {
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#587d2a]" aria-hidden />
           <p>
             Meet in a permitted public place, keep private details private, and only take on work
-            you can safely finish. Payment is simulated for this demo.
+            you can safely finish.
           </p>
         </div>
 

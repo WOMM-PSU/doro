@@ -28,6 +28,8 @@ export type TaskStatus =
 
 export type AcceptanceMode = "fixed" | "offers";
 
+export type PaymentMethod = "stripe_card" | "cash_handoff";
+
 export type OfferStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN" | "SUPERSEDED";
 
 export type PaymentState =
@@ -100,6 +102,7 @@ export interface Task {
   dropoffLocationId?: string;
   rewardCents: number;
   acceptanceMode: AcceptanceMode;
+  paymentMethod?: PaymentMethod;
   deadline: string;
   estimatedMinutes: number;
   status: TaskStatus;
@@ -186,6 +189,12 @@ export interface DemoPayment {
   requesterId: string;
   helperId: string;
   rewardCents: number;
+  expenseCents?: number;
+  platformFeeCents?: number;
+  totalCents?: number;
+  paymentMethod?: PaymentMethod;
+  stripePaymentIntentId?: string;
+  stripeMode?: "live_stripe" | "test_fallback";
   state: PaymentState;
   createdAt: string;
   updatedAt: string;
@@ -238,6 +247,7 @@ export interface TaskDraft {
   dropoffLocationId?: string;
   rewardCents: number;
   acceptanceMode: AcceptanceMode;
+  paymentMethod?: PaymentMethod;
   /** ISO string for scheduled tasks, or a relative preset resolved to ISO. */
   deadline: string;
   estimatedMinutes: number;

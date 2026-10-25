@@ -397,4 +397,64 @@ describe("demo integrity", () => {
       expect(payment.note.toLowerCase()).not.toContain("escrow");
     }
   });
+
+  it("handles Stripe card escrow and cash at handoff payment methods", () => {
+    const store = makeStore();
+    // 1. Post a cash task
+    const cashTaskResult = store.createTask(
+      futureDraft({
+        title: "Cash errand task",
+        paymentMethod: "cash_handoff",
+        rewardCents: 800,
+        expenseCents: 200,
+      }),
+    );
+    expect(cashTaskResult.ok).toBe(true);
+    if (!cashTaskResult.ok) return;
+
+    store.setActiveUser("u-alex");
+    expect(store.acceptTask(cashTaskResult.data.id).ok).toBe(true);
+
+    const cashPayment = store
+      .getSnapshot()
+      .payments.find((p) => p.taskId === cashTaskResult.data.id)!;
+    expect(cashPayment.paymentMethod).toBe("cash_handoff");
+    expect(cashPayment.rewardCents).toBe(800);
+    expect(cashPayment.expenseCents).toBe(200);
+    expect(cashPayment.platformFeeCents).toBe(0);
+    expect(cashPayment.totalCents).toBe(1000);
+    expect(cashPayment.stripePaymentIntentId).toBeUndefined();
+
+    // 2. Post a Stripe card task
+    store.setActiveUser("u-maya");
+    const stripeTaskResult = store.createTask(
+      futureDraft({
+        title: "Stripe escrow task",
+        paymentMethod: "stripe_card",
+        rewardCents: 1500,
+      }),
+    );
+    expect(stripeTaskResult.ok).toBe(true);
+    if (!stripeTaskResult.ok) return;
+
+    store.setActiveUser("u-alex");
+    expect(store.acceptTask(stripeTaskResult.data.id).ok).toBe(true);
+    const stripePayment = store
+      .getSnapshot()
+      .payments.find((p) => p.taskId === stripeTaskResult.data.id)!;
+    expect(stripePayment.paymentMethod).toBe("stripe_card");
+    expect(stripePayment.stripePaymentIntentId).toMatch(/^pi_doro_/);
+
+    // 3. Attach custom Stripe PaymentIntent ID
+    store.attachStripePaymentIntent(
+      stripeTaskResult.data.id,
+      "pi_3NxyzRealIntent123",
+      "live_stripe",
+    );
+    const updated = store
+      .getSnapshot()
+      .payments.find((p) => p.taskId === stripeTaskResult.data.id)!;
+    expect(updated.stripePaymentIntentId).toBe("pi_3NxyzRealIntent123");
+    expect(updated.stripeMode).toBe("live_stripe");
+  });
 });

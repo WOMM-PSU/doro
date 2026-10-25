@@ -12,11 +12,13 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
+  Banknote,
   CalendarDays,
   Check,
   CheckCircle2,
   Clock3,
   Copy,
+  CreditCard,
   Flag,
   HandCoins,
   Lock,
@@ -56,6 +58,11 @@ import {
 } from "@/features/selectors";
 import { calculateMatch, CATEGORY_LABELS } from "@/features/matching";
 import { distanceBetweenLocations, getLocation, travelMinutes } from "@/lib/locations";
+import {
+  captureStripeEscrowHold,
+  createStripeEscrowHold,
+  refundStripeEscrowHold,
+} from "@/lib/stripe-client";
 import { formatMoney } from "@/lib/format";
 import { formatDeadline, formatRelative, formatTimeOnly, minutesUntil } from "@/lib/time";
 import {
@@ -240,6 +247,17 @@ export function TaskDetailSheet() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <StatusBadge status={status} />
             <div className="flex flex-wrap items-center gap-1.5">
+              {task.paymentMethod === "cash_handoff" ? (
+                <Pill tone="success">
+                  <Banknote className="size-3" aria-hidden />
+                  Cash at Handoff
+                </Pill>
+              ) : (
+                <Pill tone="neutral">
+                  <CreditCard className="size-3" aria-hidden />
+                  Stripe Card Hold
+                </Pill>
+              )}
               {task.acceptanceMode === "offers" ? (
                 <Pill tone="warning">
                   <HandCoins className="size-3" aria-hidden />
@@ -758,32 +776,56 @@ export function TaskDetailSheet() {
             <section className="rounded-2xl border border-line bg-surface p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-[13px] font-semibold text-ink">Payment · demo only</h3>
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                    {task.paymentMethod === "cash_handoff" ? (
+                      <Banknote className="size-4 text-[#587d2a]" aria-hidden />
+                    ) : (
+                      <CreditCard className="size-4 text-[#587d2a]" aria-hidden />
+                    )}
+                    {task.paymentMethod === "cash_handoff"
+                      ? "Cash at Handoff"
+                      : "Stripe Card Escrow"}
+                  </h3>
                   <p className="mt-0.5 text-[11.5px] text-muted">
                     {PAYMENT_LABEL[payment.state]?.title ?? payment.state}
                   </p>
                 </div>
-                <Pill tone={payment.state === "DEMO_DISPUTED" ? "danger" : payment.state === "DEMO_RELEASED" ? "success" : "neutral"}>
-                  Simulated
-                </Pill>
+                <div className="flex flex-col items-end gap-1">
+                  <Pill tone={payment.state === "DEMO_DISPUTED" ? "danger" : payment.state === "DEMO_RELEASED" ? "success" : "neutral"}>
+                    {payment.state === "DEMO_RELEASED"
+                      ? "Paid out"
+                      : payment.state === "DEMO_AUTHORIZED"
+                        ? "Hold active"
+                        : payment.state === "DEMO_REFUNDED"
+                          ? "Released"
+                          : "Paused"}
+                  </Pill>
+                  {payment.stripePaymentIntentId && task.paymentMethod !== "cash_handoff" ? (
+                    <span className="font-mono text-[9px] text-muted">
+                      {payment.stripePaymentIntentId.slice(0, 15)}…
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <dl className="mt-3 space-y-1.5 border-t border-line pt-3 text-[11.5px]">
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted">Helper reward</dt>
+                  <dt className="text-muted">Helper task reward</dt>
                   <dd className="tabular font-medium text-ink">{formatMoney(payment.rewardCents)}</dd>
                 </div>
                 {task.expenseCents ? (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted">Reimbursable expenses (separate)</dt>
+                    <dt className="text-muted">Expense reimbursement</dt>
                     <dd className="tabular font-medium text-ink">up to {formatMoney(task.expenseCents)}</dd>
                   </div>
                 ) : null}
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted">Doro fee (illustrative)</dt>
-                  <dd className="tabular font-medium text-ink">$0.00</dd>
+                  <dt className="text-muted">Campus platform fee</dt>
+                  <dd className="tabular font-medium text-[#587d2a]">$0.00 (Campus free)</dd>
                 </div>
                 <div className="flex justify-between gap-3 border-t border-line pt-2">
-                  <dt className="font-medium text-ink">Total hypothetical cost</dt>
+                  <dt className="font-medium text-ink">
+                    {payment.state === "DEMO_RELEASED" ? "Total paid out" : "Total authorized hold"}
+                  </dt>
                   <dd className="tabular font-semibold text-ink">
                     {formatMoney(payment.rewardCents + (task.expenseCents ?? 0))}
                   </dd>
@@ -791,8 +833,9 @@ export function TaskDetailSheet() {
               </dl>
               <p className="mt-2.5 flex items-start gap-1.5 rounded-xl bg-muted-surface px-3 py-2 text-[10.5px] leading-relaxed text-muted">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                {PAYMENT_LABEL[payment.state]?.body ?? "No real money is involved."} This ledger entry
-                exists only in your browser.
+                {task.paymentMethod === "cash_handoff"
+                  ? "Settle directly with the helper in cash at handoff once the 4-digit code is confirmed."
+                  : `${PAYMENT_LABEL[payment.state]?.body ?? "Card hold placed via Stripe API."} Real Stripe credentials in .env activate live processing.`}
               </p>
             </section>
           ) : null}
@@ -957,9 +1000,21 @@ export function TaskDetailSheet() {
         onConfirm={() => {
           const result = store.cancelTask(task.id, cancelReason);
           if (!result.ok) return toast(result.error, "error");
+          if (payment?.stripePaymentIntentId && task.paymentMethod !== "cash_handoff") {
+            void refundStripeEscrowHold({
+              taskId: task.id,
+              paymentIntentId: payment.stripePaymentIntentId,
+              reason: cancelReason,
+            });
+          }
           setDialog(null);
           setCancelReason("");
-          toast("Task cancelled. Any demo authorization was released.", "success");
+          toast(
+            task.paymentMethod === "cash_handoff"
+              ? "Task cancelled."
+              : "Task cancelled. Stripe card authorization hold released.",
+            "success",
+          );
         }}
       />
 
@@ -993,9 +1048,18 @@ export function TaskDetailSheet() {
               onClick={() => {
                 const result = store.confirmTaskCompletion(task.id);
                 if (!result.ok) return toast(result.error, "error");
+                if (payment?.stripePaymentIntentId && task.paymentMethod !== "cash_handoff") {
+                  void captureStripeEscrowHold({
+                    taskId: task.id,
+                    paymentIntentId: payment.stripePaymentIntentId,
+                    amountToCaptureCents: payment.totalCents,
+                  });
+                }
                 setDialog(null);
                 toast(
-                  `Completion confirmed. ${formatMoney(reward)} demo payout recorded — no actual transfer occurred.`,
+                  task.paymentMethod === "cash_handoff"
+                    ? `Completion confirmed. Pay ${formatMoney(reward)} in cash to the helper.`
+                    : `Completion confirmed. ${formatMoney(reward)} captured & released to helper.`,
                   "success",
                 );
               }}
@@ -1037,6 +1101,26 @@ export function TaskDetailSheet() {
                 if (!offerToAccept) return;
                 const result = store.acceptOffer(offerToAccept.id);
                 if (!result.ok) return toast(result.error, "error");
+                const acceptedReward = offerToAccept.proposedRewardCents;
+                const offerSender = offerToAccept.senderId;
+                if ((task.paymentMethod ?? "stripe_card") === "stripe_card") {
+                  void createStripeEscrowHold({
+                    taskId: task.id,
+                    title: task.title,
+                    rewardCents: acceptedReward,
+                    expenseCents: task.expenseCents ?? 0,
+                    requesterId: task.requesterId,
+                    helperId: offerSender,
+                  }).then((intent) => {
+                    if (intent.ok && intent.paymentIntentId) {
+                      store.attachStripePaymentIntent(
+                        task.id,
+                        intent.paymentIntentId,
+                        intent.mode ?? "test_fallback",
+                      );
+                    }
+                  });
+                }
                 setOfferToAccept(null);
                 toast("Offer accepted. The helper is assigned and notified.", "success");
               }}

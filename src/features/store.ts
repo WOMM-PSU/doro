@@ -138,12 +138,26 @@ function authorizePayment(
   now: string,
 ): void {
   if (draft.payments.some((p) => p.taskId === task.id)) return;
+  const rewardCents = task.agreedRewardCents ?? task.rewardCents;
+  const expenseCents = task.expenseCents ?? 0;
+  const platformFeeCents = 0;
+  const totalCents = rewardCents + expenseCents + platformFeeCents;
+  const paymentMethod = task.paymentMethod ?? "stripe_card";
   draft.payments.push({
     id: newId("p"),
     taskId: task.id,
     requesterId: task.requesterId,
     helperId: task.helperId ?? "",
-    rewardCents: task.agreedRewardCents ?? task.rewardCents,
+    rewardCents,
+    expenseCents,
+    platformFeeCents,
+    totalCents,
+    paymentMethod,
+    stripePaymentIntentId:
+      paymentMethod === "stripe_card"
+        ? `pi_doro_${task.id.replace(/[^a-zA-Z0-9]/g, "")}`
+        : undefined,
+    stripeMode: paymentMethod === "stripe_card" ? "test_fallback" : undefined,
     state: "DEMO_AUTHORIZED",
     createdAt: now,
     updatedAt: now,
@@ -160,9 +174,14 @@ function setPaymentState(
   const payment = draft.payments.find((p) => p.taskId === task.id);
   if (!payment) return;
   if (payment.state === state) return;
+  const rewardCents = task.agreedRewardCents ?? payment.rewardCents;
+  const expenseCents = task.expenseCents ?? payment.expenseCents ?? 0;
   payment.state = state;
   payment.updatedAt = now;
-  payment.rewardCents = task.agreedRewardCents ?? payment.rewardCents;
+  payment.rewardCents = rewardCents;
+  payment.expenseCents = expenseCents;
+  payment.platformFeeCents = 0;
+  payment.totalCents = rewardCents + expenseCents;
   payment.note = state === "DEMO_RELEASED" ? PAYOUT_NOTE : PAYMENT_NOTE;
 }
 
@@ -350,6 +369,7 @@ export class DemoStore {
         dropoffLocationId: input.dropoffLocationId || undefined,
         rewardCents: Math.round(input.rewardCents),
         acceptanceMode: input.acceptanceMode,
+        paymentMethod: input.paymentMethod ?? "stripe_card",
         deadline: input.deadline,
         estimatedMinutes: Math.round(input.estimatedMinutes),
         status: "OPEN",
@@ -438,7 +458,7 @@ export class DemoStore {
 
       task.helperId = helper.id;
       task.agreedRewardCents = task.rewardCents;
-      if (task.dropoffLocationId) task.handoffCode = handoffCode();
+      task.handoffCode = handoffCode();
       const moved = transition(
         draft,
         task,
@@ -573,7 +593,7 @@ export class DemoStore {
       offer.status = "ACCEPTED";
       task.helperId = offer.senderId;
       task.agreedRewardCents = offer.proposedRewardCents;
-      if (task.dropoffLocationId) task.handoffCode = handoffCode();
+      task.handoffCode = handoffCode();
       const helperName =
         draft.users.find((u) => u.id === offer.senderId)?.name ?? "The helper";
       const moved = transition(
@@ -1061,6 +1081,21 @@ export class DemoStore {
       if (!report) return { ok: false, error: "Report not found." };
       report.status = status;
       return { ok: true, data: report };
+    });
+  }
+
+  attachStripePaymentIntent(
+    taskId: string,
+    paymentIntentId: string,
+    mode: "live_stripe" | "test_fallback" = "test_fallback",
+  ): ActionResult<DemoPayment> {
+    return this.apply((draft, now) => {
+      const payment = draft.payments.find((p) => p.taskId === taskId);
+      if (!payment) return { ok: false, error: "Payment record not found." };
+      payment.stripePaymentIntentId = paymentIntentId;
+      payment.stripeMode = mode;
+      payment.updatedAt = now;
+      return { ok: true, data: payment };
     });
   }
 }

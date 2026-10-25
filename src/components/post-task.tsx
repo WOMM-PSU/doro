@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
+  Banknote,
   CalendarDays,
   Check,
   ChevronDown,
+  CreditCard,
   HandCoins,
   Info,
   Lock,
@@ -17,7 +19,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import type { AcceptanceMode, TaskCategory } from "@/types";
+import type { AcceptanceMode, PaymentMethod, TaskCategory } from "@/types";
 import { useDemo, useUi } from "@/components/providers";
 import { CATEGORY_LABELS } from "@/features/matching";
 import {
@@ -84,6 +86,7 @@ export function PostTaskDialog() {
   const [rewardInput, setRewardInput] = useState("6.00");
   const [rewardTouched, setRewardTouched] = useState(false);
   const [acceptanceMode, setAcceptanceMode] = useState<AcceptanceMode>("fixed");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("stripe_card");
   const [requirements, setRequirements] = useState("");
   const [itemDescription, setItemDescription] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -139,6 +142,7 @@ export function PostTaskDialog() {
     setRewardInput("");
     setRewardTouched(false);
     setAcceptanceMode("fixed");
+    setPaymentMethod("stripe_card");
     setRequirements("");
     setItemDescription("");
     setInstructions("");
@@ -208,6 +212,7 @@ export function PostTaskDialog() {
       dropoffLocationId: isDelivery ? dropoffId : undefined,
       rewardCents,
       acceptanceMode,
+      paymentMethod,
       deadline,
       estimatedMinutes: Number(estimatedMinutes),
       requirements: requirements || undefined,
@@ -304,8 +309,12 @@ export function PostTaskDialog() {
                 </span>
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-medium text-muted">Payment</span>
-                <span className="text-[11.5px] font-medium text-ink">Simulated only</span>
+                <span className="text-[11px] font-medium text-muted">Payment method</span>
+                <span className="text-[11.5px] font-medium text-ink">
+                  {publishedTask.paymentMethod === "cash_handoff"
+                    ? "Cash at Handoff"
+                    : "Stripe Card Hold (Escrow)"}
+                </span>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -727,6 +736,56 @@ export function PostTaskDialog() {
                   className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted-surface accent-[#17191c]"
                 />
                 <RewardFactors recommendation={recommendation} />
+
+                <div className="pt-1">
+                  <p className="text-[13px] font-semibold text-ink" id="payment-method-label">
+                    Payment method
+                  </p>
+                  <div
+                    className="mt-1.5 grid gap-2 sm:grid-cols-2"
+                    role="group"
+                    aria-labelledby="payment-method-label"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={paymentMethod === "stripe_card"}
+                      onClick={() => setPaymentMethod("stripe_card")}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        paymentMethod === "stripe_card"
+                          ? "border-ink bg-surface shadow-soft"
+                          : "border-line bg-surface hover:border-[#cfd3c9]",
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+                        <CreditCard className="size-3.5" aria-hidden />
+                        Stripe Card Escrow
+                      </span>
+                      <span className="mt-0.5 block text-[10.5px] leading-relaxed text-muted">
+                        Places a card hold on assignment and releases when the 4-digit handoff code is confirmed.
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={paymentMethod === "cash_handoff"}
+                      onClick={() => setPaymentMethod("cash_handoff")}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        paymentMethod === "cash_handoff"
+                          ? "border-ink bg-surface shadow-soft"
+                          : "border-line bg-surface hover:border-[#cfd3c9]",
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+                        <Banknote className="size-3.5" aria-hidden />
+                        Cash at Handoff
+                      </span>
+                      <span className="mt-0.5 block text-[10.5px] leading-relaxed text-muted">
+                        Pay cash in person when you meet and confirm the 4-digit handoff code.
+                      </span>
+                    </button>
+                  </div>
+                </div>
               </section>
 
               <section>
@@ -787,8 +846,8 @@ export function PostTaskDialog() {
                         className="min-h-[76px]"
                       />
                     </Field>
-                    <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
-                      <Field label="Expenses" htmlFor="task-expense" optional hint="Reimbursed" error={errors.expense}>
+                    <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                      <Field label="Expenses" htmlFor="task-expense" optional error={errors.expense}>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">
                             $
@@ -894,21 +953,27 @@ export function PostTaskDialog() {
                 </p>
                 <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5">
                   <div className="flex items-center justify-between gap-2 text-[10.5px]">
-                    <span className="text-white/50">Helper reward</span>
-                    <span className="tabular font-medium text-white">{formatMoney(rewardCents)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 text-[10.5px]">
-                    <span className="text-white/50">Expenses (reimbursed)</span>
-                    <span className="tabular font-medium text-white">
-                      {expenseCents ? `up to ${formatMoney(expenseCents)}` : "—"}
+                    <span className="text-white/50">Payment method</span>
+                    <span className="font-medium text-white">
+                      {paymentMethod === "cash_handoff" ? "Cash at Handoff" : "Stripe Card Hold"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10.5px]">
-                    <span className="text-white/50">Doro fee (illustrative)</span>
-                    <span className="tabular font-medium text-white">$0.00</span>
+                    <span className="text-white/50">Helper task reward</span>
+                    <span className="tabular font-medium text-white">{formatMoney(rewardCents)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[10.5px]">
+                    <span className="text-white/50">Expense reimbursement</span>
+                    <span className="tabular font-medium text-white">
+                      {expenseCents ? `up to ${formatMoney(expenseCents)}` : "$0.00"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[10.5px]">
+                    <span className="text-white/50">Campus platform fee</span>
+                    <span className="tabular font-medium text-lime">$0.00</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-1.5 text-[11px]">
-                    <span className="text-white/70">Total hypothetical</span>
+                    <span className="text-white/70">Total payout / hold</span>
                     <span className="tabular font-semibold text-lime">
                       {formatMoney(rewardCents + expenseCents)}
                     </span>
@@ -916,7 +981,9 @@ export function PostTaskDialog() {
                 </div>
                 <p className="mt-2.5 flex items-start gap-1.5 text-[9.5px] leading-relaxed text-white/40">
                   <Wallet className="mt-0.5 size-3 shrink-0" aria-hidden />
-                  No real payment is collected. No platform fee is charged.
+                  {paymentMethod === "cash_handoff"
+                    ? "Settled in cash on handoff after 4-digit code confirmation. $0 campus fee."
+                    : "Stripe PaymentIntent authorized on assignment and captured on 4-digit handoff confirmation."}
                 </p>
               </div>
             </aside>

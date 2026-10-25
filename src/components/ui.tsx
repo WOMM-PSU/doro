@@ -276,8 +276,8 @@ export function Field({
   optional?: boolean;
 }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between gap-3">
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
         <label htmlFor={htmlFor} className="text-[13px] font-semibold text-ink">
           {label}
           {optional ? <span className="ml-1.5 font-normal text-muted">optional</span> : null}
