@@ -163,21 +163,20 @@ export function MapPanel({
   useEffect(() => {
     const L = leafletModuleRef.current;
     const map = leafletMapRef.current;
-    if (!L || !map) return;
+    if (!L || !map || styleMode === "blueprint") return;
 
     if (tileLayerRef.current) {
       tileLayerRef.current.remove();
       tileLayerRef.current = null;
     }
 
-    if (styleMode !== "blueprint") {
-      const source = TILE_SOURCES[styleMode];
-      const nextTile = L.tileLayer(source.url, {
-        maxZoom: 19,
-        subdomains: source.subdomains ?? "abc",
-      }).addTo(map);
-      tileLayerRef.current = nextTile;
-    }
+    const source = TILE_SOURCES[styleMode];
+    const nextTile = L.tileLayer(source.url, {
+      maxZoom: 19,
+      subdomains: source.subdomains ?? "abc",
+    }).addTo(map);
+    tileLayerRef.current = nextTile;
+    map.invalidateSize();
   }, [styleMode]);
 
   // Sync task markers, landmark labels, and active route line on the real Leaflet map
@@ -335,16 +334,17 @@ export function MapPanel({
             interactivePins={!tilesReady || styleMode === "blueprint"}
           />
 
-          {/* Live Leaflet Street Map Container */}
+          {/* Live Leaflet Street Map Container (wrapped so React never overwrites Leaflet's .leaflet-container classes) */}
           <div
-            ref={mapContainerRef}
             className={cn(
               "absolute inset-0 z-10 size-full transition-opacity duration-300",
               styleMode === "blueprint"
-                ? "pointer-events-none opacity-0"
-                : "opacity-100",
+                ? "pointer-events-none invisible opacity-0"
+                : "visible opacity-100",
             )}
-          />
+          >
+            <div ref={mapContainerRef} className="size-full" />
+          </div>
 
           {/* Top-Left Live Location Badge */}
           <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-line/90 bg-surface/95 px-2.5 py-1 text-[10.5px] font-semibold text-ink shadow-soft backdrop-blur-sm">
