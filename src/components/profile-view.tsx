@@ -8,6 +8,7 @@ import {
   Banknote,
   Bike,
   Bus,
+  Car,
   Check,
   CheckCircle2,
   Clock3,
@@ -324,6 +325,7 @@ export function ProfileView() {
                       },
                       { value: "bike", label: "Bike", icon: <Bike className="size-3.5" aria-hidden /> },
                       { value: "bus", label: "Bus", icon: <Bus className="size-3.5" aria-hidden /> },
+                      { value: "car", label: "Car", icon: <Car className="size-3.5" aria-hidden /> },
                     ]}
                   />
                 </div>

@@ -163,18 +163,20 @@ export function distanceBetweenLocations(fromId: string, toId: string): number {
   return haversineMiles(getLocation(fromId), getLocation(toId));
 }
 
-export type TravelModeId = "walk" | "bike" | "bus";
+export type TravelModeId = "walk" | "bike" | "bus" | "car";
 
 const SPEEDS_MPH: Record<TravelModeId, number> = {
   walk: 3.0,
   bike: 8.0,
   bus: 11.0,
+  car: 18.0,
 };
 
 const MODE_OVERHEAD_MINUTES: Record<TravelModeId, number> = {
   walk: 2,
   bike: 3,
   bus: 9,
+  car: 4,
 };
 
 export function travelMinutes(

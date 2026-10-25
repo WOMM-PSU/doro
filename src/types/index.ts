@@ -14,7 +14,7 @@ export type TaskCategory =
   | "moving"
   | "other";
 
-export type TravelMode = "walk" | "bike" | "bus";
+export type TravelMode = "walk" | "bike" | "bus" | "car";
 
 export type TaskStatus =
   | "OPEN"

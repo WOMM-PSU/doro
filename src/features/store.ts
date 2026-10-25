@@ -317,7 +317,7 @@ export class DemoStore {
       if (!Number.isFinite(next.maxDistanceMiles) || next.maxDistanceMiles < 0.5 || next.maxDistanceMiles > 5) {
         return { ok: false, error: "Discovery distance should be between 0.5 and 5 miles." };
       }
-      if (!["walk", "bike", "bus"].includes(next.travelMode)) {
+      if (!["walk", "bike", "bus", "car"].includes(next.travelMode)) {
         return { ok: false, error: "Choose a valid travel mode." };
       }
       const { startHour, endHour } = next.quietHours;
