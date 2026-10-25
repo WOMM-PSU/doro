@@ -94,12 +94,12 @@ export function DiscoverView() {
   const activeFilterCount =
     (filters.category !== "all" ? 1 : 0) +
     (filters.minRewardCents > 0 ? 1 : 0) +
-    (filters.maxDistanceMiles !== user.preferences.maxDistanceMiles ? 1 : 0);
+    (filters.maxDistanceMiles < user.preferences.maxDistanceMiles ? 1 : 0);
   const isDefaultFilters =
     filters.search.trim() === "" &&
     filters.category === "all" &&
     filters.minRewardCents === 0 &&
-    filters.maxDistanceMiles === user.preferences.maxDistanceMiles;
+    filters.maxDistanceMiles >= user.preferences.maxDistanceMiles;
 
   const resetFilters = () => {
     setFilters({
@@ -296,9 +296,18 @@ export function DiscoverView() {
                     : "Try a wider distance, a lower reward floor, or clear your filters. You can also post the first request."
                 }
                 action={
-                  <Button variant="outline" onClick={resetFilters}>
-                    Clear filters
-                  </Button>
+                  !isDefaultFilters ? (
+                    <Button variant="outline" onClick={resetFilters}>
+                      Clear filters
+                    </Button>
+                  ) : filters.mode !== "foryou" ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setFilters((f) => ({ ...f, mode: "foryou" }))}
+                    >
+                      Show For you
+                    </Button>
+                  ) : undefined
                 }
               />
             ) : (
@@ -496,16 +505,17 @@ function FiltersModal({
             id="max-distance"
             type="range"
             min={0.5}
-            max={3}
+            max={Math.max(0.5, helperDistance)}
             step={0.1}
-            value={filters.maxDistanceMiles}
+            value={Math.min(filters.maxDistanceMiles, helperDistance)}
             onChange={(e) =>
               onChange((f) => ({ ...f, maxDistanceMiles: Number(e.target.value) }))
             }
             className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted-surface accent-[#17191c]"
           />
           <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
-            Your profile allows up to {formatMiles(helperDistance)}. This filter can only narrow it.
+            Up to your profile radius of {formatMiles(helperDistance)}. Change it in Profile to
+            look further.
           </p>
         </div>
 
