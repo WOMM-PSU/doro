@@ -246,7 +246,7 @@ export function DiscoverView() {
                 tasks={ranked}
                 selectedId={selectedPin}
                 onSelect={setSelectedPin}
-                onOpen={(id) => ui.openTask(id)}
+                onOpen={ui.openTask}
                 travelMode={user.preferences.travelMode}
               />
               <div className="mt-4 space-y-3">
@@ -328,7 +328,7 @@ export function DiscoverView() {
                 tasks={ranked}
                 selectedId={selectedPin}
                 onSelect={setSelectedPin}
-                onOpen={(id) => ui.openTask(id)}
+                onOpen={ui.openTask}
                 compact
                 travelMode={user.preferences.travelMode}
               />
