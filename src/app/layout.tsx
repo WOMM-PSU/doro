@@ -15,8 +15,11 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
   // The tab icon is the circular mark. The square PNGs are install/apple
   // artwork only — pointing `icon` at them put a lime square in the tab.
+  // It lives in public/icons so it is revalidated (`max-age=0`); the app/icon
+  // convention ships the same file as `immutable, max-age=1y`, which would
+  // hide any future change to the logo.
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
     apple: "/icons/apple-touch-icon.png",
   },
 };

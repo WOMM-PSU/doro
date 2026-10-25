@@ -4,7 +4,7 @@
 
 Built for University Park, PA. The app runs end to end with **zero API keys**; every integration has a local fallback.
 
-![Doro](src/app/icon.svg)
+![Doro](public/icons/icon.svg)
 
 ## Quick start
 

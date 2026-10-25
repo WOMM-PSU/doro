@@ -8,9 +8,15 @@
  * Caching is deliberately conservative: the shell and static assets are cached,
  * API calls never are. A stale task list would be worse than an offline one, and
  * the app already keeps its state in localStorage.
+ *
+ * Bump VERSION in the same commit as any deploy that changes the shell or the
+ * brand assets. `install` skips waiting and `activate` deletes every older
+ * doro-* cache, so the next page load is served from the new bundle instead of
+ * a mix of old chunks. The registration in components/pwa-bridge.tsx reloads
+ * the tab once the new worker takes control.
  */
 
-const VERSION = "doro-v1";
+const VERSION = "doro-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 
@@ -21,7 +27,7 @@ const SHELL_URLS = [
   "/notifications",
   "/profile",
   "/manifest.webmanifest",
-  "/icon.svg",
+  "/icons/icon.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
@@ -62,7 +68,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(request, cacheName) {
+async function networkFirst(request, cacheName, { shellFallback = true } = {}) {
   const cache = await caches.open(cacheName);
   try {
     const response = await fetch(request);
@@ -71,6 +77,7 @@ async function networkFirst(request, cacheName) {
   } catch {
     const cached = await cache.match(request);
     if (cached) return cached;
+    if (!shellFallback) throw new Error("offline");
     // Any shell page will boot the client, which renders from localStorage.
     const shell =
       (await cache.match("/discover")) ||
@@ -113,9 +120,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Brand assets keep their URL across deploys (unlike hashed Next chunks),
+  // so they go to the network first: a new favicon or manifest should land on
+  // the first load after a deploy, not one visit later.
+  const isBrandAsset =
+    url.pathname.startsWith("/icons/") || url.pathname === "/manifest.webmanifest";
+  if (isBrandAsset) {
+    event.respondWith(networkFirst(request, ASSET_CACHE, { shellFallback: false }));
+    return;
+  }
+
   const isStatic =
     url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
     /\.(?:js|css|svg|png|jpg|jpeg|webp|woff2?|webmanifest)$/.test(url.pathname);
   if (isStatic) {
     event.respondWith(cacheFirst(request, ASSET_CACHE));
