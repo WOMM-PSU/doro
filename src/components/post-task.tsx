@@ -29,7 +29,12 @@ import {
 } from "@/features/pricing";
 import { inferTaskDetails, parseTaskSentence } from "@/features/task-suggestions";
 import { analyzeContent } from "@/features/moderation";
-import { getLocalLlmStatus, parseTaskWithLocalLlm, type LocalLlmStatus } from "@/lib/local-llm";
+import {
+  getSentenceAiStatus,
+  mergeSentenceParses,
+  parseTaskWithGroq,
+  type SentenceAiStatus,
+} from "@/lib/sentence-ai";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import { LOCATIONS, getLocation } from "@/lib/locations";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
@@ -105,7 +110,7 @@ export function PostTaskDialog() {
   const [description, setDescription] = useState("");
   const [sentence, setSentence] = useState("");
   const [sentenceBusy, setSentenceBusy] = useState(false);
-  const [llmStatus, setLlmStatus] = useState<LocalLlmStatus | null>(null);
+  const [aiStatus, setAiStatus] = useState<SentenceAiStatus | null>(null);
   const [category, setCategory] = useState<TaskCategory>("delivery");
   const [pickupId, setPickupId] = useState(user.homeLocationId);
   const [dropoffId, setDropoffId] = useState(
@@ -168,8 +173,8 @@ export function PostTaskDialog() {
 
   useEffect(() => {
     let active = true;
-    getLocalLlmStatus().then((status) => {
-      if (active) setLlmStatus(status);
+    getSentenceAiStatus().then((status) => {
+      if (active) setAiStatus(status);
     });
     return () => {
       active = false;
@@ -350,8 +355,10 @@ export function PostTaskDialog() {
     }
     setSentenceBusy(true);
     try {
-      const local = llmStatus?.ready ? await parseTaskWithLocalLlm(text) : null;
-      const parsed = local ?? parseTaskSentence(text);
+      // The model is a bonus: offline or erroring, this resolves null and the
+      // rule parser below still fills every field.
+      const local = aiStatus?.configured ? await parseTaskWithGroq(text) : null;
+      const parsed = mergeSentenceParses(local, parseTaskSentence(text));
       if (!parsed) {
         toast("Couldn't read that sentence. Add what, where, and when.", "error");
         return;
@@ -379,7 +386,7 @@ export function PostTaskDialog() {
       setErrors({});
       toast(
         local
-          ? "Filled from the on-device model. Review anything it guessed."
+          ? "Read by Groq. Review anything it guessed."
           : parsed.source === "rules"
             ? "Filled with the local rule parser. Review before posting."
             : "Filled the form. Review before posting.",
@@ -609,9 +616,9 @@ export function PostTaskDialog() {
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <p className="min-w-0 text-[10px] leading-relaxed text-[#5f6f45]">
                     <span className="font-semibold text-ink">
-                      {llmStatus ? llmStatus.label : "Checking this browser…"}
+                      {aiStatus ? aiStatus.label : "Checking the sentence helper…"}
                     </span>
-                    {llmStatus ? ` · ${llmStatus.detail}` : null}
+                    {aiStatus ? ` · ${aiStatus.detail}` : null}
                   </p>
                   <Button
                     type="button"

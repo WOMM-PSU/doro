@@ -46,6 +46,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { CATEGORY_ICONS } from "@/components/icons";
+import { ConnectPayouts } from "@/components/connect-payouts";
 import { DEMO_MODE } from "@/lib/demo-mode";
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as (keyof typeof CATEGORY_LABELS)[];
@@ -618,6 +619,8 @@ export function ProfileView() {
               keys and run <span className="font-mono">supabase/schema.sql</span>.
             </p>
           </section>
+
+          <ConnectPayouts />
 
           {DEMO_MODE ? (
           <section id="demo-controls" className="rounded-2xl border border-line bg-surface p-4">

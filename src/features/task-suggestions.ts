@@ -185,9 +185,12 @@ function inferDeadline(text: string, now: Date): string | undefined {
 }
 
 function inferTitle(text: string): string {
+  // Trailing punctuation blocks the clause regexes below, so drop it first.
   let title = text
+    .replace(/[.!?]+\s*$/, "")
     .replace(/\s+(?:by|before|at|around)\s+[^,.]*$/i, "")
     .replace(/\s+for\s+\$?\d[^,.]*$/i, "")
+    .replace(/[.;,\s]+$/, "")
     .trim();
   title = title.replace(/^please\s+/i, "");
   if (title.length > 90) title = `${title.slice(0, 87).trimEnd()}…`;
@@ -201,7 +204,7 @@ export function parseTaskSentence(
   const text = raw.trim();
   if (text.length < 8) return null;
   const now = options.now ?? new Date();
-  const category = inferCategory(text);
+  let category = inferCategory(text);
   const notes: string[] = [];
 
   const fromTo = /\bfrom\s+(.+?)\s+to\s+(.+?)(?=\s+(?:by|before|at|around|for|with|and)\b|[,.]|$)/i.exec(text);
@@ -221,7 +224,16 @@ export function parseTaskSentence(
     }
   }
   if (dropoffLocationId && locationId === dropoffLocationId) dropoffLocationId = undefined;
-  if (dropoffLocationId) notes.push("Two places found, so this is treated as a delivery.");
+  if (dropoffLocationId) {
+    notes.push("Two places found, so this is treated as a delivery.");
+  } else if (
+    category === "delivery" &&
+    /\b(pick ?up|pickup|grab|collect|buy|get)\b/i.test(text) &&
+    !/\b(deliver|drop ?off|bring|take)\b/i.test(text)
+  ) {
+    // "Pick up a coffee at the HUB" is a one-stop errand, not a two-leg delivery.
+    category = "errands";
+  }
 
   const deadline = inferDeadline(text, now);
   if (deadline) notes.push("Converted the time in your sentence to a deadline.");

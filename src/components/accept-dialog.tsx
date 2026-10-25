@@ -59,13 +59,17 @@ export function AcceptTaskDialog() {
                   expenseCents: task.expenseCents ?? 0,
                   requesterId: task.requesterId,
                   helperId: user.id,
+                  helperAccountId: user.stripeAccountReady ? user.stripeAccountId : undefined,
                 }).then((intent) => {
                   if (intent.ok && intent.paymentIntentId) {
                     store.attachStripePaymentIntent(
                       task.id,
                       intent.paymentIntentId,
                       intent.mode ?? "test_fallback",
+                      intent.status,
                     );
+                  } else {
+                    toast("Task accepted, but the card hold could not be created. The requester can retry from the task.", "error");
                   }
                 });
               }
@@ -73,7 +77,7 @@ export function AcceptTaskDialog() {
               toast(
                 task.paymentMethod === "cash_handoff"
                   ? `Task accepted. ${formatMoney(reward)} is due in cash at handoff.`
-                  : `Task accepted. ${formatMoney(reward + (task.expenseCents ?? 0))} Stripe card hold authorized.`,
+                  : `Task accepted. ${formatMoney(reward + (task.expenseCents ?? 0))} card hold set up for the requester.`,
                 "success",
               );
               ui.openTask(task.id);

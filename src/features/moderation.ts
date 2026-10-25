@@ -55,7 +55,8 @@ const SIGNALS: Signal[] = [
     category: "Academic integrity",
     weight: 60,
     patterns: [
-      /\b(write|do|take|complete|finish) (my|the|his|her|their) (essay|exam|quiz|test|homework|assignment|problem set|midterm|final)\b/,
+      /\b(write|do|take|complete|finish) (my|the|his|her|their) (?:[\w-]+ ){0,2}(essay|exam|quiz|test|homework|assignment|problem set|midterm|final)\b/,
+      /\b(take|do|write|complete|finish)\b.{0,40}\b(exam|quiz|midterm|final|assignment|essay|homework|problem set)\b.{0,20}\bfor me\b/,
       /\b(exam|quiz|test|homework) (answers|solutions|key)\b/,
       /\blog ?in to (my|their|his|her) (canvas|webwork|lon ?capa|email|account)\b/,
       /\b(cheat|cheating)\b/,

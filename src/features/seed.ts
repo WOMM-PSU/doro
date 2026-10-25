@@ -164,7 +164,8 @@ function buildUsers(now: Date): User[] {
 function buildTasks(now: Date): Task[] {
   const base = {
     handoffVerified: false,
-  };
+    paymentMethod: "stripe_card",
+  } as const;
 
   return [
     {
@@ -448,6 +449,8 @@ function buildTasks(now: Date): Task[] {
       ...base,
       id: "t-completed-book",
       requesterId: "u-jordan",
+      // Seeded cash task: the payment record and the task must agree.
+      paymentMethod: "cash_handoff",
       title: "Return a library book",
       description:
         "A library book needed to go back to Pattee before the due date. Simple drop in the return slot.",

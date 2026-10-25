@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
+import { getStripe, isRealPaymentIntent } from "@/lib/stripe";
 
 export interface CapturePaymentIntentBody {
   taskId: string;
@@ -9,53 +11,33 @@ export interface CapturePaymentIntentBody {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CapturePaymentIntentBody;
-    const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+    const stripe = getStripe();
 
-    if (
-      secretKey &&
-      body.paymentIntentId &&
-      body.paymentIntentId.startsWith("pi_") &&
-      !body.paymentIntentId.startsWith("pi_doro_")
-    ) {
-      const params = new URLSearchParams();
-      if (body.amountToCaptureCents && body.amountToCaptureCents > 0) {
-        params.set("amount_to_capture", String(Math.round(body.amountToCaptureCents)));
-      }
-
-      const response = await fetch(
-        `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(body.paymentIntentId)}/capture`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${secretKey}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        },
-      );
-
-      if (response.ok) {
-        const stripeData = (await response.json()) as { id: string; status: string };
-        return NextResponse.json({
-          ok: true,
-          mode: "live_stripe",
-          paymentIntentId: stripeData.id,
-          status: stripeData.status,
-        });
-      }
+    // Local demo intents and keyless installs stay simulated.
+    if (!stripe || !isRealPaymentIntent(body.paymentIntentId)) {
+      return NextResponse.json({
+        ok: true,
+        mode: "test_fallback",
+        paymentIntentId: body.paymentIntentId || `pi_doro_${body.taskId.replace(/[^a-zA-Z0-9]/g, "")}`,
+        status: "succeeded",
+      });
     }
 
+    const params: Stripe.PaymentIntentCaptureParams = {};
+    if (body.amountToCaptureCents && body.amountToCaptureCents > 0) {
+      params.amount_to_capture = Math.round(body.amountToCaptureCents);
+    }
+    // Destination charges move the helper's share as part of the capture.
+    const intent = await stripe.paymentIntents.capture(body.paymentIntentId, params);
     return NextResponse.json({
       ok: true,
-      mode: "test_fallback",
-      paymentIntentId:
-        body.paymentIntentId || `pi_doro_${body.taskId.replace(/[^a-zA-Z0-9]/g, "")}`,
-      status: "succeeded",
+      mode: "live_stripe",
+      paymentIntentId: intent.id,
+      status: intent.status,
+      amountCapturedCents: intent.amount_received,
     });
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Could not capture Stripe payment intent." },
-      { status: 400 },
-    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not capture Stripe payment intent.";
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }

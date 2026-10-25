@@ -74,8 +74,11 @@ import { distanceBetweenLocations, getLocation, travelMinutes } from "@/lib/loca
 import {
   captureStripeEscrowHold,
   createStripeEscrowHold,
+  fetchCardSecret,
   refundStripeEscrowHold,
 } from "@/lib/stripe-client";
+import { stripeCardsEnabled } from "@/lib/stripe-browser";
+import { CardHoldDialog } from "@/components/card-hold-dialog";
 import { formatMoney } from "@/lib/format";
 import { paymentLabels } from "@/lib/payment-labels";
 import {
@@ -119,6 +122,9 @@ export function TaskDetailSheet() {
   const [handoffInput, setHandoffInput] = useState("");
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardSecret, setCardSecret] = useState<string | null>(null);
+  const [cardLoading, setCardLoading] = useState(false);
   const [uploading, setUploading] = useState<TaskAttachment["kind"] | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -202,9 +208,11 @@ export function TaskDetailSheet() {
   const routeMinutes = match?.travelMinutes ?? travelMinutes(routeMiles);
   const handoffNeeded = Boolean(task.handoffCode) && !task.handoffVerified;
   const canReview = canReviewTask(state, task, user);
-  const isCash = task.paymentMethod === "cash_handoff";
+  // Older saved states predate `task.paymentMethod`, so the payment record wins.
+  const paymentMethod = payment?.paymentMethod ?? task.paymentMethod;
+  const isCash = paymentMethod === "cash_handoff";
   const paymentCopy = payment
-    ? paymentLabels({ state: payment.state, paymentMethod: payment.paymentMethod ?? task.paymentMethod })
+    ? paymentLabels({ state: payment.state, paymentMethod })
     : null;
   const overdue = isOverdue(task);
   const waitingOnLateDecision = awaitingLateDecision(task);
@@ -222,8 +230,13 @@ export function TaskDetailSheet() {
   const handleProofFile = async (
     file: File | undefined,
     kind: TaskAttachment["kind"],
+    input?: HTMLInputElement | null,
   ) => {
     if (!file) return;
+    // Keep the sheet where the helper left it. Uploading a photo must not
+    // scroll the sidebar back to the top when the gallery grows.
+    const scroller = input?.closest<HTMLElement>('[class*="overflow-y-auto"]') ?? null;
+    const scrollTop = scroller?.scrollTop ?? null;
     const invalid = validateAttachmentFile(file);
     if (invalid) {
       toast(invalid, "error");
@@ -249,6 +262,15 @@ export function TaskDetailSheet() {
         toast(result.error, "error");
         return;
       }
+      if (scroller && scrollTop !== null) {
+        const restore = () => {
+          scroller.scrollTop = scrollTop;
+        };
+        window.requestAnimationFrame(() => {
+          restore();
+          window.requestAnimationFrame(restore);
+        });
+      }
       toast(
         kind === "receipt"
           ? "Receipt attached for the requester."
@@ -260,6 +282,19 @@ export function TaskDetailSheet() {
     } finally {
       setUploading(null);
     }
+  };
+
+  const openCardHold = async () => {
+    if (!payment?.stripePaymentIntentId || cardLoading) return;
+    setCardLoading(true);
+    const result = await fetchCardSecret(payment.stripePaymentIntentId);
+    setCardLoading(false);
+    if (!result.ok || !result.clientSecret) {
+      toast(result.error ?? "Could not load the card form.", "error");
+      return;
+    }
+    setCardSecret(result.clientSecret);
+    setCardOpen(true);
   };
 
   const handleHandoff = () => {
@@ -313,7 +348,7 @@ export function TaskDetailSheet() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <StatusBadge status={status} />
             <div className="flex flex-wrap items-center gap-1.5">
-              {task.paymentMethod === "cash_handoff" ? (
+              {isCash ? (
                 <Pill tone="success">
                   <Banknote className="size-3" aria-hidden />
                   Cash at Handoff
@@ -354,7 +389,7 @@ export function TaskDetailSheet() {
                 {!waitingOnLateDecision
                   ? `The deadline passed, but a late finish is allowed. ${isHelper ? "You" : helper?.name.split(" ")[0] ?? "Your helper"} can still start.`
                   : isRequester
-                    ? `The deadline passed before ${helper?.name.split(" ")[0] ?? "your helper"} started. Allow a late finish, or cancel the task${task.paymentMethod === "cash_handoff" ? "" : " to release the card hold"}.`
+                    ? `The deadline passed before ${helper?.name.split(" ")[0] ?? "your helper"} started. Allow a late finish, or cancel the task${isCash ? "" : " to release the card hold"}.`
                     : `The deadline passed before you started. Waiting for ${requester?.name.split(" ")[0] ?? "the requester"} to allow a late finish.`}
               </p>
             </div>
@@ -780,10 +815,8 @@ export function TaskDetailSheet() {
                   : "Photos from the helper are stored on this device. Check them before confirming."}
               </p>
 
-              {task.attachments && task.attachments.length > 0 ? (
-                <AttachmentGallery attachments={task.attachments} />
-              ) : null}
-
+              {/* Upload controls first: new tiles append below instead of pushing
+                  the buttons (and the current scroll position) down. */}
               {isHelper && status === "IN_PROGRESS" ? (
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <label
@@ -807,7 +840,7 @@ export function TaskDetailSheet() {
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         event.currentTarget.value = "";
-                        void handleProofFile(file, "dropoff");
+                        void handleProofFile(file, "dropoff", event.currentTarget);
                       }}
                     />
                   </label>
@@ -835,12 +868,16 @@ export function TaskDetailSheet() {
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           event.currentTarget.value = "";
-                          void handleProofFile(file, "receipt");
+                          void handleProofFile(file, "receipt", event.currentTarget);
                         }}
                       />
                     </label>
                   ) : null}
                 </div>
+              ) : null}
+
+              {task.attachments && task.attachments.length > 0 ? (
+                <AttachmentGallery attachments={task.attachments} />
               ) : null}
             </section>
           ) : null}
@@ -961,20 +998,18 @@ export function TaskDetailSheet() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
-                    {task.paymentMethod === "cash_handoff" ? (
+                    {isCash ? (
                       <Banknote className="size-4 text-[#587d2a]" aria-hidden />
                     ) : (
                       <CreditCard className="size-4 text-[#587d2a]" aria-hidden />
                     )}
-                    {task.paymentMethod === "cash_handoff"
-                      ? "Cash at Handoff"
-                      : "Stripe Card Escrow"}
+                    {isCash ? "Cash at Handoff" : "Stripe Card Escrow"}
                   </h3>
                   <p className="mt-0.5 text-[11.5px] text-muted">{paymentCopy?.title}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <Pill tone={paymentCopy?.tone}>{paymentCopy?.status}</Pill>
-                  {payment.stripePaymentIntentId && task.paymentMethod !== "cash_handoff" ? (
+                  {payment.stripePaymentIntentId && !isCash ? (
                     <span className="font-mono text-[9px] text-muted">
                       {payment.stripePaymentIntentId.slice(0, 15)}…
                     </span>
@@ -1011,6 +1046,42 @@ export function TaskDetailSheet() {
                   ? paymentCopy?.body
                   : `${paymentCopy?.body} Real Stripe credentials in .env activate live processing.`}
               </p>
+
+              {!isCash &&
+              isRequester &&
+              stripeCardsEnabled() &&
+              payment.stripeMode === "live_stripe" &&
+              payment.state === "DEMO_AUTHORIZED" &&
+              (payment.stripeStatus === "requires_payment_method" || !payment.stripeStatus) ? (
+                <div className="mt-3 rounded-xl border border-[#f2e2b9] bg-warning-soft p-3">
+                  <p className="text-[11.5px] font-medium text-warning">
+                    {payment.stripeStatus === "requires_payment_method"
+                      ? "The card hold has not been authorized yet."
+                      : "Confirm this card hold before your helper starts."}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-[#7a6224]">
+                    Stripe holds {formatMoney(payment.totalCents ?? reward)} now and captures it only
+                    when you confirm the work is done.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="dark"
+                    className="mt-2"
+                    onClick={() => void openCardHold()}
+                    disabled={cardLoading}
+                  >
+                    <CreditCard className="size-3.5" aria-hidden />
+                    {cardLoading ? "Loading card form…" : "Authorize card hold"}
+                  </Button>
+                </div>
+              ) : null}
+
+              {!isCash && payment.stripeMode === "live_stripe" && payment.stripeStatus === "requires_capture" ? (
+                <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[10.5px] font-medium text-success">
+                  <ShieldCheck className="size-3" aria-hidden />
+                  Card hold confirmed by Stripe
+                </p>
+              ) : null}
             </section>
           ) : null}
 
@@ -1201,7 +1272,7 @@ export function TaskDetailSheet() {
         onConfirm={() => {
           const result = store.cancelTask(task.id, cancelReason);
           if (!result.ok) return toast(result.error, "error");
-          if (payment?.stripePaymentIntentId && task.paymentMethod !== "cash_handoff") {
+          if (payment?.stripePaymentIntentId && !isCash) {
             void refundStripeEscrowHold({
               taskId: task.id,
               paymentIntentId: payment.stripePaymentIntentId,
@@ -1211,9 +1282,7 @@ export function TaskDetailSheet() {
           setDialog(null);
           setCancelReason("");
           toast(
-            task.paymentMethod === "cash_handoff"
-              ? "Task cancelled."
-              : "Task cancelled. Stripe card authorization hold released.",
+            isCash ? "Task cancelled." : "Task cancelled. Stripe card authorization hold released.",
             "success",
           );
         }}
@@ -1254,7 +1323,7 @@ export function TaskDetailSheet() {
               onClick={() => {
                 const result = store.confirmTaskCompletion(task.id);
                 if (!result.ok) return toast(result.error, "error");
-                if (payment?.stripePaymentIntentId && task.paymentMethod !== "cash_handoff") {
+                if (payment?.stripePaymentIntentId && !isCash) {
                   void captureStripeEscrowHold({
                     taskId: task.id,
                     paymentIntentId: payment.stripePaymentIntentId,
@@ -1263,7 +1332,7 @@ export function TaskDetailSheet() {
                 }
                 setDialog(null);
                 toast(
-                  task.paymentMethod === "cash_handoff"
+                  isCash
                     ? `Completion confirmed. Pay ${formatMoney(reward)} in cash to the helper.`
                     : `Completion confirmed. ${formatMoney(reward)} captured & released to helper.`,
                   "success",
@@ -1317,12 +1386,17 @@ export function TaskDetailSheet() {
                     expenseCents: task.expenseCents ?? 0,
                     requesterId: task.requesterId,
                     helperId: offerSender,
+                    helperAccountId: (() => {
+                      const helper = getUser(state, offerSender);
+                      return helper?.stripeAccountReady ? helper.stripeAccountId : undefined;
+                    })(),
                   }).then((intent) => {
                     if (intent.ok && intent.paymentIntentId) {
                       store.attachStripePaymentIntent(
                         task.id,
                         intent.paymentIntentId,
                         intent.mode ?? "test_fallback",
+                        intent.status,
                       );
                     }
                   });
@@ -1363,6 +1437,25 @@ export function TaskDetailSheet() {
           </div>
         ) : null}
       </Modal>
+
+      <CardHoldDialog
+        open={cardOpen}
+        title={task.title}
+        clientSecret={cardSecret}
+        amountLabel={formatMoney(payment?.totalCents ?? reward)}
+        onClose={() => {
+          setCardOpen(false);
+          setCardSecret(null);
+        }}
+        onAuthorized={(status) => {
+          if (payment?.stripePaymentIntentId) {
+            store.attachStripePaymentIntent(task.id, payment.stripePaymentIntentId, "live_stripe", status);
+          }
+          setCardOpen(false);
+          setCardSecret(null);
+          toast("Card hold authorized. Your helper is covered.", "success");
+        }}
+      />
     </>
   );
 }

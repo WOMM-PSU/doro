@@ -1287,14 +1287,27 @@ export class DemoStore {
     taskId: string,
     paymentIntentId: string,
     mode: "live_stripe" | "test_fallback" = "test_fallback",
+    status?: string,
   ): ActionResult<DemoPayment> {
     return this.apply((draft, now) => {
       const payment = draft.payments.find((p) => p.taskId === taskId);
       if (!payment) return { ok: false, error: "Payment record not found." };
       payment.stripePaymentIntentId = paymentIntentId;
       payment.stripeMode = mode;
+      payment.stripeStatus = status ?? payment.stripeStatus;
       payment.updatedAt = now;
       return { ok: true, data: payment };
+    });
+  }
+
+  /** Remember the Stripe Connect account for a profile (no server database yet). */
+  setStripeAccount(userId: string, accountId: string, ready = false): ActionResult<User> {
+    return this.apply((draft) => {
+      const user = draft.users.find((u) => u.id === userId);
+      if (!user) return { ok: false, error: "Profile not found." };
+      user.stripeAccountId = accountId;
+      user.stripeAccountReady = ready;
+      return { ok: true, data: user };
     });
   }
 }

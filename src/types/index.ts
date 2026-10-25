@@ -89,6 +89,10 @@ export interface User {
   /** History from before the demo window, used as reputation prior. */
   history: UserHistory;
   isNew?: boolean;
+  /** Stripe Connect Express account, once this person starts onboarding. */
+  stripeAccountId?: string;
+  /** True when Stripe enabled transfers, so a destination charge can pay them. */
+  stripeAccountReady?: boolean;
 }
 
 export type AttachmentKind = "dropoff" | "receipt";
@@ -211,6 +215,8 @@ export interface DemoPayment {
   paymentMethod?: PaymentMethod;
   stripePaymentIntentId?: string;
   stripeMode?: "live_stripe" | "test_fallback";
+  /** Latest PaymentIntent status, e.g. requires_payment_method or requires_capture. */
+  stripeStatus?: string;
   state: PaymentState;
   createdAt: string;
   updatedAt: string;

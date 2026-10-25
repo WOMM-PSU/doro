@@ -17,6 +17,7 @@ import { createStateRepository } from "@/lib/repository";
 import { activeUser } from "@/features/selectors";
 import { DoroLogo } from "@/components/brand";
 import { PushBridge } from "@/components/push-bridge";
+import { PwaBridge } from "@/components/pwa-bridge";
 import {
   ToastContext,
   ToastViewport,
@@ -144,6 +145,7 @@ function HydratedDemoProvider({
       <ToastContext.Provider value={{ toast }}>
         <UiProvider>{children}</UiProvider>
         <PushBridge />
+        <PwaBridge />
         <ToastViewport toasts={toasts} />
       </ToastContext.Provider>
     </DemoContext.Provider>

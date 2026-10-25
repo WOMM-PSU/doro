@@ -10,6 +10,16 @@ export const metadata: Metadata = {
     "Doro is a local peer-to-peer task marketplace for small real-world tasks: deliveries, errands, study help, tech help and light moving.",
   applicationName: "Doro",
   keywords: ["local tasks", "campus errands", "task marketplace", "Doro"],
+  // Installable app: the manifest comes from app/manifest.ts.
+  appleWebApp: { capable: true, title: "Doro", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

@@ -61,6 +61,7 @@ describe("seed integrity", () => {
       const linked = state.tasks.find((t) => t.id === payment.taskId)!;
       expect(userIds.has(payment.helperId)).toBe(true);
       expect(linked.helperId).toBe(payment.helperId);
+      expect(linked.paymentMethod).toBe(payment.paymentMethod);
       expect(payment.rewardCents).toBe(linked.agreedRewardCents ?? linked.rewardCents);
       if (linked.status === "COMPLETED") expect(payment.state).toBe("DEMO_RELEASED");
       if (payment.state === "DEMO_RELEASED") expect(linked.status).toBe("COMPLETED");

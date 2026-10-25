@@ -25,6 +25,14 @@ describe("parseTaskSentence", () => {
     expect(parsed?.deadline).toBe(new Date(now.getTime() + 2 * 3_600_000).toISOString());
   });
 
+  it("treats a one-stop pickup as an errand, not a delivery", () => {
+    const parsed = parseTaskSentence("Pick up a medium coffee from the HUB for $8", { now });
+    expect(parsed?.category).toBe("errands");
+    expect(parsed?.locationId).toBe("hub");
+    expect(parsed?.dropoffLocationId).toBeUndefined();
+    expect(parsed?.rewardCents).toBe(800);
+  });
+
   it("does not invent a pickup when only one place is named", () => {
     const parsed = parseTaskSentence("Move three boxes to West Halls this afternoon", { now });
     expect(parsed?.category).toBe("moving");

@@ -24,6 +24,17 @@ describe("analyzeContent", () => {
     expect(result.suggestions.length).toBeGreaterThan(0);
   });
 
+  it("blocks cheating phrased with a qualifier or 'for me'", () => {
+    expect(analyzeContent("Take my online final exam for me tonight for $100").level).toBe("block");
+    expect(analyzeContent("Do my calculus homework for me").level).toBe("block");
+    expect(analyzeContent("Can you finish my history midterm for me?").level).toBe("block");
+  });
+
+  it("still allows studying for the same course", () => {
+    expect(analyzeContent("Help me study for my calculus final").level).toBe("allow");
+    expect(analyzeContent("Explain a related-rates problem from MATH 140").level).toBe("allow");
+  });
+
   it("blocks disguised substance requests", () => {
     expect(analyzeContent("need someone to bring me some w33d").level).toBe("block");
     expect(analyzeContent("can you find addreall for me").level).toBe("block");
