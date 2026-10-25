@@ -435,7 +435,7 @@ export function TaskDetailSheet() {
               icon={<Timer className="size-4" />}
               label="Estimated work"
               value={`~${task.estimatedMinutes} min`}
-              hint="Helper-provided estimate"
+              hint="Requester's estimate"
             />
             <MetaCard
               icon={<Navigation className="size-4" />}
