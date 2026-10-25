@@ -430,6 +430,17 @@ export function PostTaskDialog() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {moderation.level === "block" ? (
+                  // The warning sits at the top of the form; on phones it is
+                  // off-screen when Publish greys out, so point back to it.
+                  <button
+                    type="button"
+                    onClick={() => revealField("post-task-moderation")}
+                    className="text-[11.5px] font-medium text-danger underline underline-offset-2"
+                  >
+                    Why can't I publish?
+                  </button>
+                ) : null}
                 {hasDraft ? (
                   <Button variant="ghost" size="sm" onClick={() => setDiscardOpen(true)}>
                     Discard draft
@@ -545,6 +556,7 @@ export function PostTaskDialog() {
 
               {moderation.level !== "allow" ? (
                 <div
+                  id="post-task-moderation"
                   className={cn(
                     "rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed",
                     moderation.level === "block"
