@@ -574,7 +574,7 @@ export function MapPanel({
                 type="button"
                 onClick={cycleMapStyle}
                 title="Switch map layer style"
-                className="inline-flex h-7 items-center gap-1 rounded-full border border-line bg-surface/95 px-2.5 text-[10px] font-semibold text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
+                className="relative inline-flex h-8 items-center gap-1 rounded-full border border-line bg-surface/95 px-2.5 text-[10px] font-semibold text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
               >
                 <Layers className="size-3" aria-hidden />
                 <span>
@@ -590,7 +590,7 @@ export function MapPanel({
                 onClick={() => fitToTasks(true)}
                 title="Show all tasks"
                 aria-label="Show all tasks on the map"
-                className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
+                className="relative inline-flex size-8 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
               >
                 <Compass className="size-3.5" aria-hidden />
               </button>
@@ -600,7 +600,7 @@ export function MapPanel({
                 disabled={locating}
                 title="Show my device location"
                 aria-label="Show my device location"
-                className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface disabled:opacity-50"
+                className="relative inline-flex size-8 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface disabled:opacity-50 after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']"
               >
                 <Navigation className={cn("size-3.5", locating && "animate-pulse")} aria-hidden />
               </button>
@@ -612,7 +612,7 @@ export function MapPanel({
                   type="button"
                   onClick={() => handleZoom(1)}
                   aria-label="Zoom in"
-                  className="flex size-7 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
+                  className="flex size-8 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
                 >
                   <Plus className="size-3.5" aria-hidden />
                 </button>
@@ -621,7 +621,7 @@ export function MapPanel({
                   type="button"
                   onClick={() => handleZoom(-1)}
                   aria-label="Zoom out"
-                  className="flex size-7 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
+                  className="flex size-8 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
                 >
                   <Minus className="size-3.5" aria-hidden />
                 </button>
