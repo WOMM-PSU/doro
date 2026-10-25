@@ -26,13 +26,16 @@ type MapStyleMode = "voyager" | "osm" | "blueprint";
 
 const PSU_CENTER: [number, number] = [40.7982, -77.8588];
 const DEFAULT_ZOOM = 15;
+const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY;
 
 const TILE_SOURCES: Record<
   Exclude<MapStyleMode, "blueprint">,
   { url: string; attribution: string; subdomains?: string }
 > = {
   voyager: {
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${
+      CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ""
+    }`,
     attribution: "&copy; OpenStreetMap &copy; CARTO",
     subdomains: "abcd",
   },
