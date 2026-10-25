@@ -165,8 +165,18 @@ export function MapPanel({
           subdomains: source.subdomains ?? "abc",
         });
 
+        // If street tiles can't load at all (offline, blocked), fall back to the
+        // built-in Campus Grid instead of leaving a grey box.
+        let loadedTiles = 0;
+        let failedTiles = 0;
+        tileLayer.on("tileload", () => {
+          loadedTiles += 1;
+        });
         tileLayer.on("tileerror", () => {
-          // Graceful fallback stays usable via realistic campus blueprint underlay
+          failedTiles += 1;
+          if (cancelled || loadedTiles > 0 || failedTiles !== 4) return;
+          setStyleMode("blueprint");
+          toast("The street map couldn't load, so we switched to the Campus Grid.");
         });
 
         tileLayer.addTo(map);
