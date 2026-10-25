@@ -123,7 +123,7 @@ export function Avatar({
 }) {
   return (
     <span
-      className={cn("relative inline-flex shrink-0", className)}
+      className={cn("relative inline-flex shrink-0 rounded-full", className)}
       title={name}
     >
       <span
