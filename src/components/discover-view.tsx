@@ -211,7 +211,7 @@ export function DiscoverView() {
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_332px]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_368px]">
         <section aria-label="Task feed" className="min-w-0">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
@@ -236,31 +236,28 @@ export function DiscoverView() {
               <p className="mt-1 text-[11.5px] leading-relaxed text-muted">{mode.hint}</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="xl:hidden">
-                <SegmentedControl
-                  size="sm"
-                  ariaLabel="Feed view"
-                  value={view}
-                  onChange={setView}
-                  options={[
-                    { value: "list", label: "List", icon: <List className="size-3.5" aria-hidden /> },
-                    { value: "map", label: "Map", icon: <MapIcon className="size-3.5" aria-hidden /> },
-                  ]}
-                />
-              </div>
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Feed view"
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: "list", label: "List", icon: <List className="size-3.5" aria-hidden /> },
+                  { value: "map", label: "Map", icon: <MapIcon className="size-3.5" aria-hidden /> },
+                ]}
+              />
             </div>
           </div>
 
           {view === "map" ? (
-            <div className="xl:hidden">
+            <div>
               <MapPanel
                 tasks={ranked}
                 selectedId={selectedPin}
                 onSelect={setSelectedPin}
                 onOpen={(id) => ui.openTask(id)}
-                compact
               />
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-ink">Tasks on the map</p>
                   <Button size="sm" variant="ghost" onClick={() => setView("list")}>
@@ -268,17 +265,19 @@ export function DiscoverView() {
                     <ArrowRight className="size-3.5" aria-hidden />
                   </Button>
                 </div>
-                {ranked.slice(0, 4).map((item, index) => (
-                  <TaskCard
-                    key={item.task.id}
-                    ranked={item}
-                    rank={index}
-                    mode={filters.mode}
-                    selected={selectedPin === item.task.id}
-                    onSelect={setSelectedPin}
-                    requester={getUser(state, item.task.requesterId)}
-                  />
-                ))}
+                <div className="grid gap-3.5 min-[1500px]:grid-cols-2">
+                  {ranked.slice(0, 6).map((item, index) => (
+                    <TaskCard
+                      key={item.task.id}
+                      ranked={item}
+                      rank={index}
+                      mode={filters.mode}
+                      selected={selectedPin === item.task.id}
+                      onSelect={setSelectedPin}
+                      requester={getUser(state, item.task.requesterId)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           ) : null}

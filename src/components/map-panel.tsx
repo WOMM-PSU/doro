@@ -1,10 +1,62 @@
 "use client";
 
-import { MapPin } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import "leaflet/dist/leaflet.css";
+import {
+  ArrowRight,
+  Compass,
+  Layers,
+  MapPin,
+  Minus,
+  Navigation,
+  Plus,
+} from "lucide-react";
 import type { RankedTask } from "@/features/selectors";
-import { getLocation, mapPosition } from "@/lib/locations";
+import {
+  LOCATIONS,
+  distanceBetweenLocations,
+  getLocation,
+  mapPosition,
+  travelMinutes,
+} from "@/lib/locations";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/components/ui";
+
+type MapStyleMode = "voyager" | "osm" | "blueprint";
+
+const PSU_CENTER: [number, number] = [40.7982, -77.8588];
+const DEFAULT_ZOOM = 15;
+
+const TILE_SOURCES: Record<
+  Exclude<MapStyleMode, "blueprint">,
+  { url: string; attribution: string; subdomains?: string }
+> = {
+  voyager: {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; OpenStreetMap &copy; CARTO",
+    subdomains: "abcd",
+  },
+  osm: {
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
+  },
+};
+
+const JITTER_OFFSETS_DEG: [number, number][] = [
+  [0, 0],
+  [0.00038, 0.00052],
+  [-0.00038, -0.00048],
+  [0.00042, -0.00045],
+  [-0.00042, 0.00048],
+];
+
+const BLUEPRINT_OFFSET_PX = [
+  { x: 0, y: 0 },
+  { x: 18, y: -10 },
+  { x: -18, y: -8 },
+  { x: 10, y: 15 },
+  { x: -12, y: 16 },
+];
 
 export function MapPanel({
   tasks,
@@ -19,63 +71,600 @@ export function MapPanel({
   onOpen: (taskId: string) => void;
   compact?: boolean;
 }) {
-  const byLocation = new Map<string, RankedTask[]>();
-  for (const ranked of tasks) {
-    const list = byLocation.get(ranked.task.locationId) ?? [];
-    list.push(ranked);
-    byLocation.set(ranked.task.locationId, list);
-  }
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const leafletMapRef = useRef<import("leaflet").Map | null>(null);
+  const tileLayerRef = useRef<import("leaflet").TileLayer | null>(null);
+  const markersLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const leafletModuleRef = useRef<typeof import("leaflet") | null>(null);
 
-  const pinOffsets = [
-    { x: 0, y: 0 },
-    { x: 16, y: -8 },
-    { x: -16, y: -6 },
-    { x: 8, y: 14 },
-    { x: -10, y: 16 },
-  ];
+  const [styleMode, setStyleMode] = useState<MapStyleMode>("voyager");
+  const [tilesReady, setTilesReady] = useState(false);
+
+  const selectedRanked = useMemo(
+    () =>
+      tasks.find((r) => r.task.id === selectedId) ?? tasks[0] ?? null,
+    [tasks, selectedId],
+  );
+
+  const byLocation = useMemo(() => {
+    const grouped = new Map<string, RankedTask[]>();
+    for (const ranked of tasks) {
+      const list = grouped.get(ranked.task.locationId) ?? [];
+      list.push(ranked);
+      grouped.set(ranked.task.locationId, list);
+    }
+    return grouped;
+  }, [tasks]);
+
+  // Initialize real Leaflet map instance on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initMap() {
+      if (!mapContainerRef.current || leafletMapRef.current) return;
+      try {
+        const L = await import("leaflet");
+        if (cancelled || !mapContainerRef.current) return;
+        leafletModuleRef.current = L;
+
+        const map = L.map(mapContainerRef.current, {
+          center: PSU_CENTER,
+          zoom: compact ? 14.5 : DEFAULT_ZOOM,
+          zoomControl: false,
+          attributionControl: false,
+          zoomSnap: 0.5,
+        });
+
+        const source = TILE_SOURCES.voyager;
+        const tileLayer = L.tileLayer(source.url, {
+          maxZoom: 19,
+          subdomains: source.subdomains ?? "abc",
+        });
+
+        tileLayer.on("load", () => {
+          if (!cancelled) setTilesReady(true);
+        });
+        tileLayer.on("tileerror", () => {
+          // Graceful fallback stays usable via realistic campus blueprint underlay
+        });
+
+        tileLayer.addTo(map);
+
+        const routeLayer = L.layerGroup().addTo(map);
+        const markersLayer = L.layerGroup().addTo(map);
+
+        leafletMapRef.current = map;
+        tileLayerRef.current = tileLayer;
+        routeLayerRef.current = routeLayer;
+        markersLayerRef.current = markersLayer;
+        setTilesReady(true);
+      } catch {
+        // Headless test environments without full DOM layout fall back cleanly to Blueprint mode
+      }
+    }
+
+    void initMap();
+
+    return () => {
+      cancelled = true;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        tileLayerRef.current = null;
+        markersLayerRef.current = null;
+        routeLayerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Switch tile source when styleMode changes
+  useEffect(() => {
+    const L = leafletModuleRef.current;
+    const map = leafletMapRef.current;
+    if (!L || !map) return;
+
+    if (tileLayerRef.current) {
+      tileLayerRef.current.remove();
+      tileLayerRef.current = null;
+    }
+
+    if (styleMode !== "blueprint") {
+      const source = TILE_SOURCES[styleMode];
+      const nextTile = L.tileLayer(source.url, {
+        maxZoom: 19,
+        subdomains: source.subdomains ?? "abc",
+      }).addTo(map);
+      tileLayerRef.current = nextTile;
+    }
+  }, [styleMode]);
+
+  // Sync task markers, landmark labels, and active route line on the real Leaflet map
+  useEffect(() => {
+    const L = leafletModuleRef.current;
+    const map = leafletMapRef.current;
+    const markersLayer = markersLayerRef.current;
+    const routeLayer = routeLayerRef.current;
+    if (!L || !map || !markersLayer || !routeLayer) return;
+
+    markersLayer.clearLayers();
+    routeLayer.clearLayers();
+
+    // 1. Subtle campus landmark reference labels
+    for (const loc of LOCATIONS) {
+      const labelIcon = L.divIcon({
+        className: "doro-landmark-label",
+        html: `<div style="transform:translate(-50%, 10px);white-space:nowrap;font-size:9px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#3a3e45;text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 4px rgba(255,255,255,0.95);pointer-events:none;">${loc.shortLabel}</div>`,
+        iconSize: [0, 0],
+      });
+      L.marker([loc.lat, loc.lng], {
+        icon: labelIcon,
+        interactive: false,
+      }).addTo(markersLayer);
+    }
+
+    // 2. Active task route polyline (pickup -> dropoff)
+    const activeTask = selectedRanked?.task;
+    if (activeTask && activeTask.dropoffLocationId) {
+      const pickupLoc = getLocation(activeTask.locationId);
+      const dropoffLoc = getLocation(activeTask.dropoffLocationId);
+
+      L.polyline(
+        [
+          [pickupLoc.lat, pickupLoc.lng],
+          [dropoffLoc.lat, dropoffLoc.lng],
+        ],
+        {
+          color: "#17191c",
+          weight: 3,
+          dashArray: "6 6",
+          opacity: 0.85,
+        },
+      ).addTo(routeLayer);
+
+      const dropIcon = L.divIcon({
+        className: "doro-dropoff-pin",
+        html: `<div style="transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;background:#d7ff65;color:#17191c;border:1.5px solid #17191c;border-radius:999px;padding:2px 7px;font-size:9.5px;font-weight:700;box-shadow:0 2px 8px rgba(23,25,28,0.22);white-space:nowrap;">Drop · ${dropoffLoc.shortLabel}</div>`,
+        iconSize: [0, 0],
+      });
+      L.marker([dropoffLoc.lat, dropoffLoc.lng], {
+        icon: dropIcon,
+        interactive: false,
+      }).addTo(routeLayer);
+    }
+
+    // 3. Interactive task reward pins
+    for (const [locationId, group] of byLocation.entries()) {
+      const baseLoc = getLocation(locationId);
+      group.slice(0, 5).forEach((ranked, idx) => {
+        const [dLat, dLng] = JITTER_OFFSETS_DEG[idx] ?? [0, 0];
+        const lat = baseLoc.lat + dLat;
+        const lng = baseLoc.lng + dLng;
+        const isSelected =
+          (selectedId ?? selectedRanked?.task.id) === ranked.task.id;
+        const priceText = formatMoney(ranked.task.rewardCents, {
+          compact: true,
+        });
+
+        const bg = isSelected ? "#17191c" : "#ffffff";
+        const fg = isSelected ? "#d7ff65" : "#17191c";
+        const border = isSelected ? "#17191c" : "#17191c";
+        const dotColor = isSelected ? "#d7ff65" : "#8fb329";
+        const scale = isSelected ? "scale(1.1)" : "scale(1)";
+
+        const pinIcon = L.divIcon({
+          className: "doro-task-pin",
+          html: `<button type="button" aria-label="Open ${ranked.task.title}, ${formatMoney(ranked.task.rewardCents)}" style="transform:translate(-50%,-50%) ${scale};display:inline-flex;align-items:center;gap:5px;background:${bg};color:${fg};border:1.5px solid ${border};border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;box-shadow:0 3px 10px rgba(23,25,28,0.22);cursor:pointer;transition:transform 140ms ease;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:${dotColor};display:inline-block;"></span>${priceText}</button>`,
+          iconSize: [0, 0],
+        });
+
+        const marker = L.marker([lat, lng], {
+          icon: pinIcon,
+          zIndexOffset: isSelected ? 1000 : idx * 10,
+        });
+
+        marker.on("click", () => {
+          onSelect(ranked.task.id);
+          onOpen(ranked.task.id);
+        });
+
+        marker.addTo(markersLayer);
+      });
+    }
+  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen]);
+
+  // Smoothly pan map when user selects a pin from the feed
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!map || !selectedId) return;
+    const found = tasks.find((r) => r.task.id === selectedId);
+    if (!found) return;
+    const loc = getLocation(found.task.locationId);
+    map.panTo([loc.lat, loc.lng], { animate: true, duration: 0.35 });
+  }, [selectedId, tasks]);
+
+  const handleZoom = (delta: number) => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+    map.setZoom(map.getZoom() + delta);
+  };
+
+  const handleRecenter = () => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+    map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate: true });
+  };
+
+  const cycleMapStyle = () => {
+    setStyleMode((prev) =>
+      prev === "voyager" ? "osm" : prev === "osm" ? "blueprint" : "voyager",
+    );
+  };
+
+  const activePickup = selectedRanked
+    ? getLocation(selectedRanked.task.locationId)
+    : null;
+  const activeDropoff =
+    selectedRanked?.task.dropoffLocationId
+      ? getLocation(selectedRanked.task.dropoffLocationId)
+      : null;
+  const activeMiles =
+    activePickup && activeDropoff
+      ? distanceBetweenLocations(activePickup.id, activeDropoff.id)
+      : 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-soft">
       <div className="relative">
         <div
           className={cn(
-            "map-surface relative w-full overflow-hidden",
-            compact ? "aspect-[4/3]" : "aspect-[5/4]",
+            "relative w-full overflow-hidden bg-[#eaece4]",
+            compact ? "aspect-[4/3]" : "aspect-[16/10] min-h-[340px]",
           )}
-          role="img"
-          aria-label="Schematic demo map of approximate campus task locations"
+          role="region"
+          aria-label="Interactive Penn State University Park campus map"
         >
-          <svg viewBox="0 0 100 80" className="absolute inset-0 size-full" aria-hidden preserveAspectRatio="none">
-            <path className="map-green" d="M2 58 C18 48, 28 58, 38 50 C48 42, 52 26, 70 22 C84 18, 92 24, 99 20 L99 79 L2 79 Z" />
-            <path className="map-road" d="M-4 60 C16 56, 30 48, 48 44 C64 40, 80 30, 104 26" />
-            <path className="map-road" d="M18 82 C26 64, 38 54, 46 40 C54 26, 58 14, 62 -4" />
-            <path className="map-road" d="M86 82 C80 64, 70 52, 66 38 C62 26, 66 14, 70 -4" />
-            <path className="map-road opacity-70" d="M-4 34 C14 32, 28 28, 44 28 C62 28, 78 34, 104 32" />
-            <circle cx="46" cy="39" r="8.5" fill="rgba(255,255,255,0.5)" />
-            <text x="46" y="55" textAnchor="middle" fontSize="3" fill="#6a7163">
-              campus core
-            </text>
-          </svg>
+          {/* Realistic Architectural Penn State Street & Building Blueprint Underlay */}
+          <CampusBlueprintUnderlay
+            tasks={tasks}
+            byLocation={byLocation}
+            selectedId={selectedId ?? selectedRanked?.task.id ?? null}
+            onSelect={onSelect}
+            onOpen={onOpen}
+            interactivePins={!tilesReady || styleMode === "blueprint"}
+          />
 
-          {["hub", "pattee", "west-halls", "east-halls", "pollock-halls", "downtown"].map((id) => {
-            const location = getLocation(id);
-            const { x, y } = mapPosition(location);
-            return (
-              <span
-                key={id}
-                className="pointer-events-none absolute -translate-x-1/2 translate-y-3 whitespace-nowrap text-[8px] font-medium uppercase tracking-wide text-[#7c8375] sm:text-[9px]"
-                style={{ left: `${x}%`, top: `${y}%` }}
-                aria-hidden
+          {/* Live Leaflet Street Map Container */}
+          <div
+            ref={mapContainerRef}
+            className={cn(
+              "absolute inset-0 z-10 size-full transition-opacity duration-300",
+              styleMode === "blueprint"
+                ? "pointer-events-none opacity-0"
+                : "opacity-100",
+            )}
+          />
+
+          {/* Top-Left Live Location Badge */}
+          <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-line/90 bg-surface/95 px-2.5 py-1 text-[10.5px] font-semibold text-ink shadow-soft backdrop-blur-sm">
+            <span className="size-2 rounded-full bg-[#8fb329]" aria-hidden />
+            <span>University Park, PA</span>
+          </div>
+
+          {/* Top-Right Interactive Map Controls (Layer Switcher, Recenter, Zoom) */}
+          <div className="absolute right-3 top-3 z-20 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={cycleMapStyle}
+                title="Switch map layer style"
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-line bg-surface/95 px-2.5 text-[10px] font-semibold text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
               >
-                {location.shortLabel}
-              </span>
-            );
-          })}
+                <Layers className="size-3" aria-hidden />
+                <span>
+                  {styleMode === "voyager"
+                    ? "Street"
+                    : styleMode === "osm"
+                      ? "OSM"
+                      : "Campus Grid"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRecenter}
+                title="Recenter on Penn State campus core"
+                aria-label="Recenter map on campus core"
+                className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
+              >
+                <Compass className="size-3.5" aria-hidden />
+              </button>
+            </div>
 
-          {Array.from(byLocation.entries()).flatMap(([locationId, group]) => {
+            {styleMode !== "blueprint" ? (
+              <div className="flex flex-col self-end overflow-hidden rounded-xl border border-line bg-surface/95 shadow-soft backdrop-blur-sm">
+                <button
+                  type="button"
+                  onClick={() => handleZoom(1)}
+                  aria-label="Zoom in"
+                  className="flex size-7 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                </button>
+                <div className="h-px bg-line" />
+                <button
+                  type="button"
+                  onClick={() => handleZoom(-1)}
+                  aria-label="Zoom out"
+                  className="flex size-7 items-center justify-center text-ink transition-colors hover:bg-muted-surface"
+                >
+                  <Minus className="size-3.5" aria-hidden />
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Empty State Overlay */}
+          {tasks.length === 0 ? (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#eef1e9]/85 px-6 text-center backdrop-blur-[2px]">
+              <MapPin className="size-6 text-muted" aria-hidden />
+              <p className="text-sm font-medium text-ink">
+                No pins with these filters
+              </p>
+              <p className="text-xs text-muted">
+                Clear filters to see nearby tasks across campus again.
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Selected Task Route Preview Strip */}
+        {selectedRanked ? (
+          <div className="flex items-center justify-between gap-3 border-t border-line bg-surface px-3.5 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-[10.5px] font-medium text-muted">
+                <Navigation className="size-3 shrink-0 text-ink" aria-hidden />
+                <span className="truncate font-semibold text-ink">
+                  {activePickup?.shortLabel}
+                  {activeDropoff ? ` → ${activeDropoff.shortLabel}` : ""}
+                </span>
+                {activeMiles > 0 ? (
+                  <span className="shrink-0 text-muted">
+                    · {activeMiles.toFixed(2)} mi (~
+                    {travelMinutes(activeMiles, "walk")}m walk)
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-0.5 truncate text-xs font-semibold text-ink">
+                {selectedRanked.task.title}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onOpen(selectedRanked.task.id)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[11px] font-semibold text-lime transition-transform hover:scale-[1.02]"
+            >
+              <span>
+                {formatMoney(selectedRanked.task.rewardCents, {
+                  compact: true,
+                })}
+              </span>
+              <ArrowRight className="size-3" aria-hidden />
+            </button>
+          </div>
+        ) : null}
+
+        {/* Map Attribution & Pin Summary Footer */}
+        <div className="flex items-center justify-between gap-3 border-t border-line bg-muted-surface/50 px-3.5 py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium text-muted">
+            <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
+            {tasks.length} open {tasks.length === 1 ? "task" : "tasks"} around
+            campus
+          </span>
+          <span className="text-[10px] text-muted">
+            {styleMode === "blueprint"
+              ? "Campus Architectural Grid · University Park"
+              : "© OpenStreetMap · Public campus landmarks"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Realistic architectural street & building footprint map of Penn State
+ * University Park. Serves both as the selectable "Campus Grid" mode and as an
+ * instant zero-latency underlay before street tiles finish loading.
+ */
+function CampusBlueprintUnderlay({
+  tasks,
+  byLocation,
+  selectedId,
+  onSelect,
+  onOpen,
+  interactivePins,
+}: {
+  tasks: RankedTask[];
+  byLocation: Map<string, RankedTask[]>;
+  selectedId: string | null;
+  onSelect: (taskId: string) => void;
+  onOpen: (taskId: string) => void;
+  interactivePins: boolean;
+}) {
+  const selectedRanked =
+    tasks.find((r) => r.task.id === selectedId) ?? tasks[0] ?? null;
+  const pickupPos = selectedRanked
+    ? mapPosition(getLocation(selectedRanked.task.locationId))
+    : null;
+  const dropoffPos = selectedRanked?.task.dropoffLocationId
+    ? mapPosition(getLocation(selectedRanked.task.dropoffLocationId))
+    : null;
+
+  return (
+    <div className="absolute inset-0 size-full select-none bg-[#e9ede3]">
+      <svg
+        viewBox="0 0 100 100"
+        className="absolute inset-0 size-full"
+        aria-hidden
+        preserveAspectRatio="none"
+      >
+        {/* Campus Greens / Lawns (Old Main Lawn, HUB Lawn, Pattee Mall, IM Fields) */}
+        <rect
+          x="32"
+          y="42"
+          width="16"
+          height="24"
+          rx="2"
+          fill="#d6e2cd"
+          opacity="0.85"
+        />
+        <rect
+          x="48"
+          y="50"
+          width="16"
+          height="14"
+          rx="2"
+          fill="#d6e2cd"
+          opacity="0.85"
+        />
+        <rect
+          x="26"
+          y="24"
+          width="14"
+          height="18"
+          rx="1.5"
+          fill="#d6e2cd"
+          opacity="0.75"
+        />
+        <path
+          d="M68 8 L98 8 L98 34 L72 34 Z"
+          fill="#d6e2cd"
+          opacity="0.65"
+        />
+
+        {/* Secondary Campus Walkways & Blocks */}
+        <g stroke="#f6f7f2" strokeWidth="0.9" opacity="0.9">
+          <line x1="18" y1="15" x2="18" y2="90" />
+          <line x1="30" y1="15" x2="30" y2="90" />
+          <line x1="42" y1="15" x2="42" y2="90" />
+          <line x1="54" y1="15" x2="54" y2="90" />
+          <line x1="78" y1="15" x2="78" y2="90" />
+          <line x1="8" y1="26" x2="94" y2="26" />
+          <line x1="8" y1="48" x2="94" y2="48" />
+          <line x1="8" y1="70" x2="94" y2="70" />
+        </g>
+
+        {/* Major Arterial Roads (Park Ave, Curtin Rd, Pollock Rd, E. College Ave, W. Beaver Ave, Shortlidge Rd, N. Atherton St) */}
+        <g stroke="#ffffff" strokeLinecap="round">
+          {/* Park Ave (North) */}
+          <path d="M 2 14 Q 48 16 98 12" strokeWidth="2.4" fill="none" />
+          {/* Curtin Rd */}
+          <line x1="4" y1="36" x2="96" y2="34" strokeWidth="2.2" />
+          {/* Pollock Rd */}
+          <line x1="10" y1="58" x2="94" y2="56" strokeWidth="2.2" />
+          {/* E. College Ave */}
+          <line x1="0" y1="80" x2="100" y2="76" strokeWidth="3.0" />
+          {/* E. Beaver Ave */}
+          <line x1="0" y1="91" x2="100" y2="87" strokeWidth="2.4" />
+          {/* N. Atherton St (West) */}
+          <line x1="8" y1="0" x2="14" y2="100" strokeWidth="2.8" />
+          {/* Burrowes Rd */}
+          <line x1="25" y1="10" x2="28" y2="96" strokeWidth="2.0" />
+          {/* Shortlidge Rd */}
+          <line x1="64" y1="10" x2="67" y2="94" strokeWidth="2.2" />
+        </g>
+
+        {/* Architectural Building Footprints */}
+        <g fill="#d5d9ce" stroke="#bfc5b6" strokeWidth="0.4">
+          {/* Pattee & Paterno Library */}
+          <rect x="26" y="44" width="6.5" height="4.2" rx="0.6" />
+          {/* Kern */}
+          <rect x="28" y="61" width="4.5" height="3.5" rx="0.6" />
+          {/* West Halls */}
+          <rect x="11" y="65" width="6" height="5" rx="0.6" />
+          {/* Willard */}
+          <rect x="40" y="68" width="5.5" height="3.8" rx="0.6" />
+          {/* HUB-Robeson Center */}
+          <rect x="49" y="53" width="7.2" height="4.6" rx="0.8" />
+          {/* Pollock Halls */}
+          <rect x="68" y="56" width="6.5" height="4.8" rx="0.6" />
+          {/* East Halls & Findlay */}
+          <rect x="82" y="32" width="7.5" height="6" rx="0.8" />
+          {/* North Halls */}
+          <rect x="61" y="15" width="5.5" height="4.2" rx="0.6" />
+          {/* South Halls & Redifer */}
+          <rect x="53" y="82" width="6.5" height="4.5" rx="0.6" />
+        </g>
+
+        {/* Street Names */}
+        <text
+          x="52"
+          y="75.5"
+          fontSize="2.2"
+          fontWeight="600"
+          fill="#686e60"
+          letterSpacing="0.08em"
+        >
+          E. COLLEGE AVE
+        </text>
+        <text
+          x="45"
+          y="33.5"
+          fontSize="2.0"
+          fontWeight="600"
+          fill="#686e60"
+          letterSpacing="0.08em"
+        >
+          CURTIN RD
+        </text>
+        <text
+          x="45"
+          y="55.5"
+          fontSize="2.0"
+          fontWeight="600"
+          fill="#686e60"
+          letterSpacing="0.08em"
+        >
+          POLLOCK RD
+        </text>
+
+        {/* Active Route Connector in Blueprint Mode */}
+        {pickupPos && dropoffPos ? (
+          <line
+            x1={pickupPos.x}
+            y1={pickupPos.y}
+            x2={dropoffPos.x}
+            y2={dropoffPos.y}
+            stroke="#17191c"
+            strokeWidth="0.9"
+            strokeDasharray="2 1.5"
+          />
+        ) : null}
+      </svg>
+
+      {/* Landmark Labels */}
+      {LOCATIONS.map((location) => {
+        const { x, y } = mapPosition(location);
+        return (
+          <span
+            key={location.id}
+            className="pointer-events-none absolute -translate-x-1/2 translate-y-3 whitespace-nowrap text-[8px] font-semibold uppercase tracking-wide text-[#5a6053] sm:text-[9px]"
+            style={{ left: `${x}%`, top: `${y}%` }}
+            aria-hidden
+          >
+            {location.shortLabel}
+          </span>
+        );
+      })}
+
+      {/* Interactive Pin Buttons when in Blueprint mode or before Leaflet tiles finish mounting */}
+      {interactivePins
+        ? Array.from(byLocation.entries()).flatMap(([locationId, group]) => {
             const base = mapPosition(getLocation(locationId));
             return group.slice(0, 5).map((ranked, index) => {
-              const offset = pinOffsets[index] ?? { x: 0, y: 0 };
+              const offset = BLUEPRINT_OFFSET_PX[index] ?? { x: 0, y: 0 };
               const selected = ranked.task.id === selectedId;
               return (
                 <button
@@ -90,7 +679,7 @@ export function MapPanel({
                     "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold shadow-soft transition-all",
                     selected
                       ? "z-20 scale-110 border-ink bg-ink text-lime"
-                      : "border-white bg-surface text-ink hover:scale-105 hover:border-ink",
+                      : "border-ink/80 bg-surface text-ink hover:scale-105 hover:border-ink",
                   )}
                   style={{
                     left: `calc(${base.x}% + ${offset.x}px)`,
@@ -109,25 +698,8 @@ export function MapPanel({
                 </button>
               );
             });
-          })}
-
-          {tasks.length === 0 ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#eef1e9]/80 px-6 text-center">
-              <MapPin className="size-6 text-muted" aria-hidden />
-              <p className="text-sm font-medium text-ink">No pins with these filters</p>
-              <p className="text-xs text-muted">Clear filters to see nearby tasks again.</p>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex items-center justify-between gap-3 border-t border-line bg-surface px-3 py-2">
-          <span className="inline-flex items-center gap-1.5 text-[10.5px] text-muted">
-            <span className="size-1.5 rounded-full bg-[#a6c43f]" aria-hidden />
-            {tasks.length} open {tasks.length === 1 ? "task" : "tasks"}
-          </span>
-          <span className="text-[10px] text-muted">Approximate demo locations · not to scale</span>
-        </div>
-      </div>
+          })
+        : null}
     </div>
   );
 }
