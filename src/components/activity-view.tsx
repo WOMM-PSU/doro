@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -54,16 +54,40 @@ const TABS: { value: TabValue; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+const TAB_STORAGE_KEY = "doro.activity.tab";
+
 const ACTIVE_STATUSES = ["OPEN", "ASSIGNED", "IN_PROGRESS", "AWAITING_CONFIRMATION"];
 
 export function ActivityView() {
   const { state, user } = useDemo();
   const ui = useUi();
   const [tab, setTab] = useState<TabValue>("needs");
+  const previousUser = useRef(user.id);
+
+  // Remember the tab for this browser tab so coming back to Activity doesn't
+  // reset it; switching persona still starts at "Needs you".
+  useEffect(() => {
+    try {
+      const saved = window.sessionStorage.getItem(TAB_STORAGE_KEY);
+      if (TABS.some((t) => t.value === saved)) setTab(saved as TabValue);
+    } catch {
+      // Storage can be unavailable (private mode); the default tab is fine.
+    }
+  }, []);
 
   useEffect(() => {
+    if (previousUser.current === user.id) return;
+    previousUser.current = user.id;
     setTab("needs");
   }, [user.id]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
+    } catch {
+      // Ignore: remembering the tab is only a convenience.
+    }
+  }, [tab]);
 
   const tasksFor = useMemo(() => {
     const isParticipant = (task: Task) =>
