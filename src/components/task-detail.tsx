@@ -57,6 +57,7 @@ import {
   hasCompletedForRequester,
 } from "@/features/selectors";
 import { calculateMatch, CATEGORY_LABELS } from "@/features/matching";
+import { analyzeMessage } from "@/features/moderation";
 import { distanceBetweenLocations, getLocation, travelMinutes } from "@/lib/locations";
 import {
   captureStripeEscrowHold,
@@ -136,6 +137,7 @@ export function TaskDetailSheet() {
 
   const open = Boolean(task && ui.selectedTaskId);
   const messages = useMemo(() => (task ? getMessages(state, task.id) : []), [state, task]);
+  const messageModeration = useMemo(() => analyzeMessage(messageBody), [messageBody]);
 
   useEffect(() => {
     if (!open || !task) return;
@@ -734,6 +736,23 @@ export function TaskDetailSheet() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
+              {canMessage && messageModeration.level !== "allow" ? (
+                <div
+                  className={cn(
+                    "mx-3 mt-3 rounded-xl border px-3 py-2 text-[10.5px] leading-relaxed",
+                    messageModeration.level === "block"
+                      ? "border-[#f1d3ce] bg-danger-soft text-danger"
+                      : "border-[#f0e2bd] bg-warning-soft text-warning",
+                  )}
+                  role="status"
+                >
+                  <span className="font-semibold">
+                    {messageModeration.level === "block" ? "This message is blocked" : "Heads up"}
+                  </span>{" "}
+                  {messageModeration.suggestions[0] ??
+                    `Flagged for ${messageModeration.reasons.join(", ")}.`}
+                </div>
+              ) : null}
               {canMessage ? (
                 <form onSubmit={sendMessage} className="flex items-end gap-2 border-t border-line p-3">
                   <label htmlFor="message-body" className="sr-only">
@@ -758,7 +777,7 @@ export function TaskDetailSheet() {
                     size="sm"
                     variant="dark"
                     className="mb-0.5 size-10 shrink-0 rounded-full p-0"
-                    disabled={!messageBody.trim()}
+                    disabled={!messageBody.trim() || messageModeration.level === "block"}
                     aria-label="Send message"
                   >
                     <Send className="size-4" aria-hidden />

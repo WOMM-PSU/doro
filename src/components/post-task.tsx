@@ -28,6 +28,7 @@ import {
   type RewardRecommendation,
 } from "@/features/pricing";
 import { inferTaskDetails } from "@/features/task-suggestions";
+import { analyzeContent } from "@/features/moderation";
 import { LOCATIONS, getLocation } from "@/lib/locations";
 import { formatDeadline, fromDateTimeLocalValue, toDateTimeLocalValue } from "@/lib/time";
 import { formatMoney } from "@/lib/format";
@@ -120,6 +121,14 @@ export function PostTaskDialog() {
   const inference = useMemo(
     () => inferTaskDetails(`${title} ${description}`),
     [title, description],
+  );
+
+  const moderation = useMemo(
+    () =>
+      analyzeContent(
+        `${title} ${description} ${requirements} ${itemDescription} ${instructions}`,
+      ),
+    [title, description, requirements, itemDescription, instructions],
   );
 
   useEffect(() => {
@@ -276,7 +285,13 @@ export function PostTaskDialog() {
                     Discard draft
                   </Button>
                 ) : null}
-                <Button type="submit" form="post-task-form" variant="lime" size="lg">
+                <Button
+                  type="submit"
+                  form="post-task-form"
+                  variant="lime"
+                  size="lg"
+                  disabled={moderation.level === "block"}
+                >
                   <Plus className="size-4" aria-hidden />
                   Publish task
                 </Button>
@@ -368,6 +383,40 @@ export function PostTaskDialog() {
                 <div className="flex items-start gap-2 rounded-xl border border-[#f1d3ce] bg-danger-soft px-3 py-2.5 text-[12px] leading-relaxed text-danger" role="alert">
                   <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {formError}
+                </div>
+              ) : null}
+
+              {moderation.level !== "allow" ? (
+                <div
+                  className={cn(
+                    "rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed",
+                    moderation.level === "block"
+                      ? "border-[#f1d3ce] bg-danger-soft text-danger"
+                      : "border-[#f0e2bd] bg-warning-soft text-warning",
+                  )}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    <ShieldCheck className="size-4 shrink-0" aria-hidden />
+                    {moderation.level === "block"
+                      ? "This can't be posted as written"
+                      : "Check this before you post"}
+                  </p>
+                  <p className="mt-1">
+                    The local classifier flagged: {moderation.reasons.join(", ")}. No text leaves
+                    your browser.
+                  </p>
+                  {moderation.suggestions.length > 0 ? (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {moderation.suggestions.map((suggestion) => (
+                        <li key={suggestion} className="flex items-start gap-1.5">
+                          <span className="mt-1.5 size-1 shrink-0 rounded-full bg-current" aria-hidden />
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ) : null}
 

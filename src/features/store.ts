@@ -30,7 +30,7 @@ import { calculateMatch, CATEGORY_LABELS, MATCH_CONFIG } from "@/features/matchi
 import { formatMiles, formatMoney } from "@/lib/format";
 import { getLocation } from "@/lib/locations";
 import { inQuietHours, minutesUntil } from "@/lib/time";
-import { detectProhibitedRequest, REPORT_REASONS } from "@/features/moderation";
+import { analyzeMessage, detectProhibitedRequest, REPORT_REASONS } from "@/features/moderation";
 import { getTask } from "@/features/selectors";
 
 /** The only legal task transitions. Components cannot bypass this table. */
@@ -921,6 +921,13 @@ export class DemoStore {
       const trimmed = body.trim();
       if (!trimmed) return { ok: false, error: "Write a message first." };
       if (trimmed.length > 1000) return { ok: false, error: "Keep messages under 1,000 characters." };
+      const moderation = analyzeMessage(trimmed);
+      if (moderation.level === "block") {
+        return {
+          ok: false,
+          error: `Message blocked by the local safety check: ${moderation.reasons.join(", ")}.`,
+        };
+      }
       const message: Message = {
         id: newId("m"),
         taskId,
