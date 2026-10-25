@@ -13,7 +13,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
-import { BadgeCheck, CheckCircle2, Loader2, Star, X } from "lucide-react";
+import { BadgeCheck, CheckCircle2, ChevronDown, Loader2, Star, X } from "lucide-react";
 import type { TaskStatus } from "@/types";
 
 import { cn } from "@/lib/cn";
@@ -254,9 +254,15 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(CONTROL, "h-11 appearance-none pr-9", className)} {...props}>
-      {children}
-    </select>
+    <div className="relative">
+      <select className={cn(CONTROL, "h-11 appearance-none pr-9", className)} {...props}>
+        {children}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted"
+        aria-hidden
+      />
+    </div>
   );
 }
 
