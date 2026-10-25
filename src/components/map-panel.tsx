@@ -18,9 +18,10 @@ import {
   getLocation,
   mapPosition,
   travelMinutes,
+  type TravelModeId,
 } from "@/lib/locations";
 import { formatMoney } from "@/lib/format";
-import { cn } from "@/components/ui";
+import { cn, useToast } from "@/components/ui";
 
 type MapStyleMode = "voyager" | "osm" | "blueprint";
 
@@ -67,22 +68,27 @@ export function MapPanel({
   onSelect,
   onOpen,
   compact,
+  travelMode = "walk",
 }: {
   tasks: RankedTask[];
   selectedId: string | null;
   onSelect: (taskId: string) => void;
   onOpen: (taskId: string) => void;
   compact?: boolean;
+  travelMode?: TravelModeId;
 }) {
+  const { toast } = useToast();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<import("leaflet").Map | null>(null);
   const tileLayerRef = useRef<import("leaflet").TileLayer | null>(null);
   const markersLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const routeLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
+  const userLayerRef = useRef<import("leaflet").LayerGroup | null>(null);
   const leafletModuleRef = useRef<typeof import("leaflet") | null>(null);
 
   const [styleMode, setStyleMode] = useState<MapStyleMode>("voyager");
   const [tilesReady, setTilesReady] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const selectedRanked = useMemo(
     () =>
@@ -136,11 +142,13 @@ export function MapPanel({
 
         const routeLayer = L.layerGroup().addTo(map);
         const markersLayer = L.layerGroup().addTo(map);
+        const userLayer = L.layerGroup().addTo(map);
 
         leafletMapRef.current = map;
         tileLayerRef.current = tileLayer;
         routeLayerRef.current = routeLayer;
         markersLayerRef.current = markersLayer;
+        userLayerRef.current = userLayer;
         setTilesReady(true);
       } catch {
         // Headless test environments without full DOM layout fall back cleanly to Blueprint mode
@@ -157,6 +165,7 @@ export function MapPanel({
         tileLayerRef.current = null;
         markersLayerRef.current = null;
         routeLayerRef.current = null;
+        userLayerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +199,7 @@ export function MapPanel({
     const routeLayer = routeLayerRef.current;
     if (!L || !map || !markersLayer || !routeLayer) return;
 
+    let cancelled = false;
     markersLayer.clearLayers();
     routeLayer.clearLayers();
 
@@ -212,7 +222,7 @@ export function MapPanel({
       const pickupLoc = getLocation(activeTask.locationId);
       const dropoffLoc = getLocation(activeTask.dropoffLocationId);
 
-      L.polyline(
+      const routeLine = L.polyline(
         [
           [pickupLoc.lat, pickupLoc.lng],
           [dropoffLoc.lat, dropoffLoc.lng],
@@ -224,6 +234,30 @@ export function MapPanel({
           opacity: 0.85,
         },
       ).addTo(routeLayer);
+
+      // Routes are only drawn for tasks that actually have two places.
+      const params = new URLSearchParams({
+        from: `${pickupLoc.lat},${pickupLoc.lng}`,
+        to: `${dropoffLoc.lat},${dropoffLoc.lng}`,
+        mode: travelMode,
+      });
+      void fetch(`/api/route?${params.toString()}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then(
+          (route: { geometry?: [number, number][]; source?: string } | null) => {
+            if (cancelled || !route?.geometry?.length) return;
+            routeLine.setLatLngs(route.geometry);
+            routeLine.setStyle({
+              color: route.source === "osrm" ? "#4f6b1e" : "#17191c",
+              weight: 4,
+              dashArray: route.source === "osrm" ? undefined : "6 6",
+              opacity: 0.9,
+            });
+          },
+        )
+        .catch(() => {
+          // The dashed straight line stays as the fallback.
+        });
 
       const dropIcon = L.divIcon({
         className: "doro-dropoff-pin",
@@ -274,7 +308,11 @@ export function MapPanel({
         marker.addTo(markersLayer);
       });
     }
-  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [byLocation, selectedId, selectedRanked, onSelect, onOpen, travelMode]);
 
   // Smoothly pan map when user selects a pin from the feed
   useEffect(() => {
@@ -296,6 +334,48 @@ export function MapPanel({
     const map = leafletMapRef.current;
     if (!map) return;
     map.setView(PSU_CENTER, compact ? 14.5 : DEFAULT_ZOOM, { animate: true });
+  };
+
+  const handleLocate = () => {
+    const L = leafletModuleRef.current;
+    const map = leafletMapRef.current;
+    const layer = userLayerRef.current;
+    if (!navigator.geolocation) {
+      toast("This browser doesn't expose a location API.", "error");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocating(false);
+        if (!L || !map || !layer) return;
+        const { latitude, longitude, accuracy } = position.coords;
+        layer.clearLayers();
+        L.circle([latitude, longitude], {
+          radius: Math.min(250, Math.max(25, accuracy)),
+          color: "#17191c",
+          weight: 1,
+          fillColor: "#d7ff65",
+          fillOpacity: 0.12,
+        }).addTo(layer);
+        L.circleMarker([latitude, longitude], {
+          radius: 7,
+          color: "#17191c",
+          weight: 2,
+          fillColor: "#d7ff65",
+          fillOpacity: 1,
+        })
+          .bindTooltip("Your device location", { direction: "top" })
+          .addTo(layer);
+        map.setView([latitude, longitude], Math.max(map.getZoom(), 16), { animate: true });
+        toast("Centered on your device location. It is not shared with anyone.", "success");
+      },
+      () => {
+        setLocating(false);
+        toast("Location permission was denied or unavailable.", "error");
+      },
+      { enableHighAccuracy: false, timeout: 8_000, maximumAge: 60_000 },
+    );
   };
 
   const cycleMapStyle = () => {
@@ -381,6 +461,16 @@ export function MapPanel({
                 className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface"
               >
                 <Compass className="size-3.5" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={handleLocate}
+                disabled={locating}
+                title="Show my device location"
+                aria-label="Show my device location"
+                className="inline-flex size-7 items-center justify-center rounded-full border border-line bg-surface/95 text-ink shadow-soft backdrop-blur-sm transition-colors hover:bg-muted-surface disabled:opacity-50"
+              >
+                <Navigation className={cn("size-3.5", locating && "animate-pulse")} aria-hidden />
               </button>
             </div>
 

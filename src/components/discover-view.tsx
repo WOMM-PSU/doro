@@ -256,6 +256,7 @@ export function DiscoverView() {
                 selectedId={selectedPin}
                 onSelect={setSelectedPin}
                 onOpen={(id) => ui.openTask(id)}
+                travelMode={user.preferences.travelMode}
               />
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -344,6 +345,7 @@ export function DiscoverView() {
                 onSelect={setSelectedPin}
                 onOpen={(id) => ui.openTask(id)}
                 compact
+                travelMode={user.preferences.travelMode}
               />
             </div>
 
