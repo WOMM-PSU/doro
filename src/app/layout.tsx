@@ -13,11 +13,10 @@ export const metadata: Metadata = {
   // Installable app: the manifest comes from app/manifest.ts.
   appleWebApp: { capable: true, title: "Doro", statusBarStyle: "default" },
   formatDetection: { telephone: false },
+  // The tab icon is the circular mark. The square PNGs are install/apple
+  // artwork only — pointing `icon` at them put a lime square in the tab.
   icons: {
-    icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: "/icons/apple-touch-icon.png",
   },
 };
