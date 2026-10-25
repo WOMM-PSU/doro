@@ -232,6 +232,38 @@ export function PostTaskDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
+  // "Post again" on an expired task opens the composer prefilled with it.
+  useEffect(() => {
+    if (!ui.composeOpen || !ui.repostTaskId) return;
+    const source = state.tasks.find((t) => t.id === ui.repostTaskId);
+    if (!source) return;
+    resetAll();
+    setTitle(source.title);
+    setDescription(source.description);
+    setCategory(source.category);
+    if (source.category === "delivery" && source.dropoffLocationId) {
+      setPickupId(source.locationId);
+      setDropoffId(source.dropoffLocationId);
+    } else {
+      setLocationId(source.locationId);
+    }
+    setEstimatedMinutes(source.estimatedMinutes);
+    setDurationTouched(true);
+    setRewardInput((source.rewardCents / 100).toFixed(2));
+    setRewardTouched(true);
+    setAcceptanceMode(source.acceptanceMode);
+    setPaymentMethod(source.paymentMethod ?? "stripe_card");
+    setAllowLateFinish(Boolean(source.allowLateFinish));
+    setRequirements(source.requirements?.join("\n") ?? "");
+    setItemDescription(source.itemDescription ?? "");
+    setInstructions(source.instructions ?? "");
+    setExpenseInput(source.expenseCents ? (source.expenseCents / 100).toFixed(2) : "");
+    setExpenseNote(source.expenseNote ?? "");
+    setMoreOpen(Boolean(source.requirements?.length || source.itemDescription || source.instructions || source.expenseCents));
+    // Only a new repost request should prefill; later edits must stick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.composeOpen, ui.repostTaskId]);
+
   const hasDraft =
     title.trim().length > 0 ||
     description.trim().length > 0 ||

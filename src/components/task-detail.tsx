@@ -78,7 +78,14 @@ import {
 } from "@/lib/stripe-client";
 import { formatMoney } from "@/lib/format";
 import { paymentLabels } from "@/lib/payment-labels";
-import { formatDeadline, formatRelative, formatTimeLeft, formatTimeOnly, minutesUntil } from "@/lib/time";
+import {
+  formatDeadline,
+  formatRelative,
+  formatTimeLeft,
+  formatTimeOnly,
+  minutesUntil,
+  toDateTimeLocalValue,
+} from "@/lib/time";
 import {
   Avatar,
   Button,
@@ -124,6 +131,10 @@ export function TaskDetailSheet() {
     setMessageBody("");
     setUploading(null);
     setOfferError(null);
+    setCancelReason("");
+    setDisputeReason("");
+    setReviewRating(5);
+    setReviewComment("");
     if (task) {
       setOfferAmount(String(task.rewardCents / 100));
       setOfferTime("");
@@ -915,7 +926,9 @@ export function TaskDetailSheet() {
                     value={messageBody}
                     onChange={(e) => setMessageBody(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      // On touch keyboards Enter adds a new line; the send button sends.
+                      const touchKeyboard = window.matchMedia("(pointer: coarse)").matches;
+                      if (e.key === "Enter" && !e.shiftKey && !touchKeyboard) {
                         e.preventDefault();
                         if (messageBody.trim()) sendMessage(e);
                       }
@@ -1062,6 +1075,21 @@ export function TaskDetailSheet() {
             </section>
           ) : null}
 
+          {status === "EXPIRED" ? (
+            <section className="rounded-2xl border border-line bg-muted-surface p-4">
+              <h3 className="text-[13px] font-semibold text-ink">Expired</h3>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
+                Nobody accepted this task before its deadline, so it closed automatically.
+                {isRequester ? " You can post it again with a new deadline." : ""}
+              </p>
+              {isRequester ? (
+                <Button size="sm" variant="lime" className="mt-2.5" onClick={() => ui.repostTask(task.id)}>
+                  Post again
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
+
           {status === "CANCELLED" ? (
             <section className="rounded-2xl border border-line bg-muted-surface p-4">
               <h3 className="text-[13px] font-semibold text-ink">Cancelled</h3>
@@ -1120,6 +1148,10 @@ export function TaskDetailSheet() {
           const dollars = Number(offerAmount);
           if (!Number.isFinite(dollars) || dollars < 1) {
             setOfferError("Enter an offer of at least $1.00.");
+            return;
+          }
+          if (offerTime && new Date(offerTime).getTime() <= Date.now()) {
+            setOfferError("Pick a proposed time in the future, or leave it empty.");
             return;
           }
           const result = store.makeOffer(
@@ -1605,6 +1637,7 @@ function OfferDialog({
           <Input
             id="offer-time"
             type="datetime-local"
+            min={toDateTimeLocalValue(new Date())}
             value={proposedTime}
             onChange={(e) => setProposedTime(e.target.value)}
           />
@@ -1745,7 +1778,11 @@ function CancelDialog({
       }
     >
       <div className="space-y-3">
-        <Field label="Reason" htmlFor="cancel-reason" hint="Shown to the helper">
+        <Field
+          label="Reason"
+          htmlFor="cancel-reason"
+          hint={reason.trim().length < 3 ? "At least 3 characters · shown to the helper" : "Shown to the helper"}
+        >
           <Textarea
             id="cancel-reason"
             value={reason}
@@ -1795,7 +1832,11 @@ function DisputeDialog({
         </div>
       }
     >
-      <Field label="What happened?" htmlFor="dispute-reason">
+      <Field
+        label="What happened?"
+        htmlFor="dispute-reason"
+        hint={reason.trim().length < 5 ? "At least 5 characters" : undefined}
+      >
         <Textarea
           id="dispute-reason"
           value={reason}

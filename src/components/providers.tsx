@@ -43,7 +43,10 @@ interface UiContextValue {
   openTask: (taskId: string) => void;
   closeTask: () => void;
   composeOpen: boolean;
+  /** Task the open composer was prefilled from ("Post again"), if any. */
+  repostTaskId: string | null;
   openCompose: () => void;
+  repostTask: (taskId: string) => void;
   closeCompose: () => void;
   reportTarget: { taskId?: string; userId?: string; subject: "TASK" | "USER" } | null;
   openReport: (target: { taskId?: string; userId?: string; subject: "TASK" | "USER" }) => void;
@@ -148,6 +151,7 @@ function UiProvider({ children }: { children: ReactNode }) {
   const { state } = useDemo();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [repostTaskId, setRepostTaskId] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<UiContextValue["reportTarget"]>(null);
   const [acceptTaskId, setAcceptTaskId] = useState<string | null>(null);
 
@@ -162,7 +166,15 @@ function UiProvider({ children }: { children: ReactNode }) {
 
   const openTask = useCallback((taskId: string) => setSelectedTaskId(taskId), []);
   const closeTask = useCallback(() => setSelectedTaskId(null), []);
-  const openCompose = useCallback(() => setComposeOpen(true), []);
+  const openCompose = useCallback(() => {
+    setRepostTaskId(null);
+    setComposeOpen(true);
+  }, []);
+  const repostTask = useCallback((taskId: string) => {
+    setSelectedTaskId(null);
+    setRepostTaskId(taskId);
+    setComposeOpen(true);
+  }, []);
   const closeCompose = useCallback(() => setComposeOpen(false), []);
   const openReport = useCallback((target: NonNullable<UiContextValue["reportTarget"]>) => {
     setReportTarget(target);
@@ -177,7 +189,9 @@ function UiProvider({ children }: { children: ReactNode }) {
       openTask,
       closeTask,
       composeOpen,
+      repostTaskId,
       openCompose,
+      repostTask,
       closeCompose,
       reportTarget,
       openReport,
@@ -191,7 +205,9 @@ function UiProvider({ children }: { children: ReactNode }) {
       openTask,
       closeTask,
       composeOpen,
+      repostTaskId,
       openCompose,
+      repostTask,
       closeCompose,
       reportTarget,
       openReport,
